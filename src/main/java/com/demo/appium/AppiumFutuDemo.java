@@ -10,9 +10,12 @@ import java.util.Collections;
 import java.util.List;
 
 import org.openqa.selenium.Dimension;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.ios.IOSDriver;
@@ -75,29 +78,52 @@ public class AppiumFutuDemo {
         }
     }
 
+    public WebElement findElementAndClick(String elementXPathString) {
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
+            
+            // 先等待元素可见
+            WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
+            
+            // 再等待元素可点击
+            wait.until(ExpectedConditions.elementToBeClickable(el));
+            
+            // 尝试点击2次
+            int maxAttempts = 2;
+            Exception lastException = null;
+            
+            for (int i = 0; i < maxAttempts; i++) {
+                try {
+                    el.click();
+                    return el;
+                } catch (Exception e) {
+                    lastException = e;
+                    Thread.sleep(500);
+                }
+            }
+            
+            throw new RuntimeException("点击元素失败，已重试" + maxAttempts + "次", lastException);
+            
+        } catch (TimeoutException e) {
+            throw new RuntimeException("等待元素超时: " + elementXPathString, e);
+        } catch (Exception e) {
+            throw new RuntimeException("操作元素失败: " + elementXPathString, e);
+        }
+    }
+
     public void doGatherFutuInfo() {
-        WebElement el = driver
-                .findElement(AppiumBy.xpath("//XCUIElementTypeImage[contains(@name,'icon_tabbar_markets')]"));
+        findElementAndClick("//XCUIElementTypeImage[contains(@name,'icon_tabbar_markets')]");
 
-        el.click();
-
-        el = driver
-                .findElement(AppiumBy.xpath("//XCUIElementTypeStaticText[@name='美股']"));
-        el.click();
+        findElementAndClick("//XCUIElementTypeStaticText[@name='美股']");
 
         WebElement targetElement = findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='机构追踪']", 10);
 
         if (targetElement != null)
             targetElement.click();
 
-        el = driver
-                .findElement(AppiumBy.xpath("//XCUIElementTypeStaticText[@name='热门机构']"));
-        el.click();
-
-        el = driver
-                .findElement(AppiumBy.xpath(
-                        "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText"));
-        el.click();
+        findElementAndClick("//XCUIElementTypeStaticText[@name='热门机构']");
+        findElementAndClick("//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText");
+       
 
         WebElement blackElement = driver
                 .findElement(AppiumBy.xpath("//XCUIElementTypeButton[contains(@name,'accessidentifier.futu.main')]"));
