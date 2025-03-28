@@ -33,11 +33,18 @@ public class AppiumFutuDemo {
         AppiumFutuDemo futuDemo = new AppiumFutuDemo();
 
         try {
-            futuDemo.init();
 
-            // futuDemo.doGatherFutuInfo();
+            String udid = "00008101-000D196A2691001E";
+            String platformVersion = "18.3.2";
 
-            futuDemo.test();
+            udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
+            platformVersion = "15.8.2";
+
+            futuDemo.init(udid,platformVersion);
+
+            futuDemo.doGatherFutuInfo();
+
+            //futuDemo.test();
         } finally {
             futuDemo.destory();
 
@@ -50,13 +57,13 @@ public class AppiumFutuDemo {
         findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持仓行业分布']", 10);
     }
 
-    public void init() {
+    public void init(String udid,String platformVersion) {
         try {
 
             XCUITestOptions options = new XCUITestOptions()
-                    .setUdid("00008101-000D196A2691001E")
+                    .setUdid(udid)
                     .setPlatformName("iOS")
-                    .setPlatformVersion("18.3.2")
+                    .setPlatformVersion(platformVersion)
                     .setBundleId("cn.futu.FutuTraderPhone");
 
             driver = new IOSDriver(
