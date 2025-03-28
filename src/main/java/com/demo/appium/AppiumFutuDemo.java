@@ -7,7 +7,9 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.TimeoutException;
@@ -134,24 +136,68 @@ public class AppiumFutuDemo {
         // scrollDown(2);
 
         List<String[]> data = new ArrayList<>();
+        Set<String> processedRows = new HashSet<>(); // 用于存储已处理的行
+        int consecutiveDuplicates = 0;
+        int maxConsecutiveDuplicates = 1; // 连续发现重复数据的次数阈值
+        
+        int scrollCount = 0;
+        int maxScrollCount = 2; // 最大下翻次数限制
 
-        List<WebElement> elements = driver.findElements(
-                AppiumBy.xpath("//XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
+        while (consecutiveDuplicates < maxConsecutiveDuplicates && scrollCount < maxScrollCount) {
+            List<WebElement> elements = driver.findElements(
+                    AppiumBy.xpath("//XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
+            
+            boolean foundNewData = false;
+            
+            for (WebElement element : elements) {
 
-        for (WebElement element : elements) {
-            // 获取每个 element 中的所有 XCUIElementTypeStaticText，并按照页面顺序排列
-            List<WebElement> staticTexts = element
-                    .findElements(AppiumBy.xpath(".//XCUIElementTypeStaticText[position()]"));
+                if (!element.isDisplayed())
+                    continue;
 
-            if (staticTexts.size() >= 6) {
-                List<String> row = new ArrayList<>();
-                for (WebElement staticText : staticTexts) {
-                    if (!staticText.getText().equals("添利")) {
-                        row.add(staticText.getText());
+                List<WebElement> staticTexts = element
+                        .findElements(AppiumBy.xpath(".//XCUIElementTypeStaticText[position()]"));
+
+                if (staticTexts.size() >= 6) {
+                    List<String> row = new ArrayList<>();
+                    for (WebElement staticText : staticTexts) {
+                        if (!staticText.getText().equals("添利")) {
+                            row.add(staticText.getText());
+                        }
+                    }
+                    
+                    String rowString = String.join("|", row);
+                    
+                    if (processedRows.add(rowString)) {
+                        data.add(row.toArray(new String[0]));
+                        foundNewData = true;
                     }
                 }
-                data.add(row.toArray(new String[0]));
             }
+            
+            if (!foundNewData) {
+                consecutiveDuplicates++;
+            } else {
+                consecutiveDuplicates = 0;
+            }
+            
+            // 向下滚动并增加计数
+            scroll(1, false);
+            scrollCount++;
+            
+            System.out.println("已下翻 " + scrollCount + " 次，处理数据 " + data.size() + " 条");
+            
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // 打印结束原因
+        if (scrollCount >= maxScrollCount) {
+            System.out.println("达到最大下翻次数限制：" + maxScrollCount + " 次");
+        } else {
+            System.out.println("连续 " + maxConsecutiveDuplicates + " 次未发现新数据，停止处理");
         }
 
         // 将数据写入CSV文件
