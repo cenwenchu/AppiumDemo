@@ -33,7 +33,7 @@ public class AppiumFutuDemo {
 
     public static void main(String[] args) {
 
-        System.out.println("start to futu!");
+        System.out.println("开始分析富途牛牛!");
 
         AppiumFutuDemo futuDemo = new AppiumFutuDemo();
 
@@ -42,18 +42,18 @@ public class AppiumFutuDemo {
             String udid = "00008101-000D196A2691001E";
             String platformVersion = "18.3.2";
 
-            udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
-            platformVersion = "15.8.2";
+            // udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
+            // platformVersion = "15.8.2";
 
-            futuDemo.init(udid,platformVersion);
+            futuDemo.init(udid, platformVersion);
 
-            futuDemo.doGatherFutuInfo();
+            futuDemo.doGatherFutuInfo(3);
 
-            //futuDemo.test();
+            // futuDemo.test();
         } finally {
             futuDemo.destory();
 
-            System.out.println("end to futu!");
+            System.out.println("富途牛牛分析结束!");
         }
 
     }
@@ -62,7 +62,7 @@ public class AppiumFutuDemo {
         findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持仓行业分布']", 10);
     }
 
-    public void init(String udid,String platformVersion) {
+    public void init(String udid, String platformVersion) {
         try {
 
             XCUITestOptions options = new XCUITestOptions()
@@ -80,75 +80,104 @@ public class AppiumFutuDemo {
         }
     }
 
-    public WebElement findElementAndClick(String elementXPathString) {
-        try {
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
-            
-            // 先等待元素可见
-            WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
-            
-            // 再等待元素可点击
-            wait.until(ExpectedConditions.elementToBeClickable(el));
-            
-            // 尝试点击2次
-            int maxAttempts = 2;
-            Exception lastException = null;
-            
-            for (int i = 0; i < maxAttempts; i++) {
-                try {
-                    el.click();
-                    return el;
-                } catch (Exception e) {
-                    lastException = e;
-                    Thread.sleep(500);
-                }
-            }
-            
-            throw new RuntimeException("点击元素失败，已重试" + maxAttempts + "次", lastException);
-            
-        } catch (TimeoutException e) {
-            throw new RuntimeException("等待元素超时: " + elementXPathString, e);
-        } catch (Exception e) {
-            throw new RuntimeException("操作元素失败: " + elementXPathString, e);
-        }
-    }
-
-    public void doGatherFutuInfo() {
+    public void doGatherFutuInfo(int agencyCount) {
         findElementAndClick("//XCUIElementTypeImage[contains(@name,'icon_tabbar_markets')]");
 
-        findElementAndClick("//XCUIElementTypeStaticText[@name='美股']");
+        findElementAndClick(
+                "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='美股']");
 
-        WebElement targetElement = findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='机构追踪']", 10);
+        WebElement targetElement = findElementByScroll(driver,
+                "//XCUIElementTypeButton/XCUIElementTypeStaticText[@name='机构追踪']", 10);
 
         if (targetElement != null)
             targetElement.click();
 
         findElementAndClick("//XCUIElementTypeStaticText[@name='热门机构']");
-        findElementAndClick("//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText");
-       
 
-        WebElement blackElement = driver
-                .findElement(AppiumBy.xpath("//XCUIElementTypeButton[contains(@name,'accessidentifier.futu.main')]"));
+        Set<String> processedAgents = new HashSet<>(); 
 
-        findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持股列表']", 10);
+        while (agencyCount > 0) {
+            List<WebElement> agencyElements = driver
+                    .findElements(AppiumBy.xpath(
+                            "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
 
-        // scrollHorizontal(2,0.3,false);
-        // scrollDown(2);
+            if (agencyElements.isEmpty())
+                break;
 
+            boolean processedRows = false;
+
+            for (int i = 0; i < agencyElements.size(); i++) {
+
+                if (agencyCount <= 0)
+                    break;
+
+                try {
+                    // 尝试将字符串转换为数字
+                    Double.parseDouble(agencyElements.get(i).getText());
+                    continue; // 如果是数字，跳过当前循环
+                } catch (NumberFormatException e) {
+                    // 如果不是数字，继续执行后续代码
+                }
+
+                if (!agencyElements.get(i).isDisplayed())
+                    continue;
+
+                if (processedAgents.contains(agencyElements.get(i).getText()))
+                    continue;
+
+                System.out.println("机构： " + agencyElements.get(i).getText() + " 开始处理... ");
+
+                String csvNameString = agencyElements.get(i).getText() + "持股情况";
+                agencyElements.get(i).click();
+
+                WebElement backElement = driver
+                        .findElement(AppiumBy
+                                .xpath("//XCUIElementTypeButton[contains(@name,'accessidentifier.futu.main')]"));
+
+                findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持股列表']", 10);
+
+                getAgencyDetail(csvNameString, backElement, 2, false);
+
+                System.out.println("机构： " + agencyElements.get(i).getText() + " 处理完毕. ");
+
+                agencyCount -= 1;
+                processedAgents.add(agencyElements.get(i).getText());
+                processedRows = true;
+
+            }
+
+            if (!processedRows)
+                break;
+            else
+            {
+                scroll(1, false);
+            }
+
+        }
+
+        // 停顿5秒（5000毫秒）
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    void getAgencyDetail(String csvFileName, WebElement backElement, int maxScrollCount, boolean isAppend) {
         List<String[]> data = new ArrayList<>();
         Set<String> processedRows = new HashSet<>(); // 用于存储已处理的行
         int consecutiveDuplicates = 0;
         int maxConsecutiveDuplicates = 1; // 连续发现重复数据的次数阈值
-        
+
         int scrollCount = 0;
-        int maxScrollCount = 2; // 最大下翻次数限制
 
         while (consecutiveDuplicates < maxConsecutiveDuplicates && scrollCount < maxScrollCount) {
             List<WebElement> elements = driver.findElements(
-                    AppiumBy.xpath("//XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
-            
+                    AppiumBy.xpath(
+                            "//XCUIElementTypeTable/XCUIElementTypeCell/XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
+
             boolean foundNewData = false;
-            
+
             for (WebElement element : elements) {
 
                 if (!element.isDisplayed())
@@ -164,30 +193,30 @@ public class AppiumFutuDemo {
                             row.add(staticText.getText());
                         }
                     }
-                    
+
                     String rowString = String.join("|", row);
-                    
+
                     if (processedRows.add(rowString)) {
                         data.add(row.toArray(new String[0]));
                         foundNewData = true;
                     }
                 }
             }
-            
+
             if (!foundNewData) {
                 consecutiveDuplicates++;
             } else {
                 consecutiveDuplicates = 0;
             }
-            
+
             // 向下滚动并增加计数
             scroll(1, false);
             scrollCount++;
-            
+
             System.out.println("已下翻 " + scrollCount + " 次，处理数据 " + data.size() + " 条");
-            
+
             try {
-                Thread.sleep(1000);
+                Thread.sleep(200);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -201,15 +230,44 @@ public class AppiumFutuDemo {
         }
 
         // 将数据写入CSV文件
-        writeToCSV("futu_data.csv", data, false);
+        writeToCSV(csvFileName, data, isAppend, "名称,持仓比例,变动股份,变动比例");
 
-        blackElement.click();
+        System.out.println("一共有效的数据为：" + data.size() + " 条");
 
-        // 停顿5秒（5000毫秒）
+        backElement.click();
+    }
+
+    public WebElement findElementAndClick(String elementXPathString) {
         try {
-            Thread.sleep(5000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
+
+            // 先等待元素可见
+            WebElement el = wait
+                    .until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
+
+            // 再等待元素可点击
+            wait.until(ExpectedConditions.elementToBeClickable(el));
+
+            // 尝试点击2次
+            int maxAttempts = 2;
+            Exception lastException = null;
+
+            for (int i = 0; i < maxAttempts; i++) {
+                try {
+                    el.click();
+                    return el;
+                } catch (Exception e) {
+                    lastException = e;
+                    Thread.sleep(500);
+                }
+            }
+
+            throw new RuntimeException("点击元素失败，已重试" + maxAttempts + "次", lastException);
+
+        } catch (TimeoutException e) {
+            throw new RuntimeException("等待元素超时: " + elementXPathString, e);
+        } catch (Exception e) {
+            throw new RuntimeException("操作元素失败: " + elementXPathString, e);
         }
     }
 
@@ -220,7 +278,7 @@ public class AppiumFutuDemo {
      * @param data     数据列表
      * @param append   是否追加到文件末尾
      */
-    public void writeToCSV(String fileName, List<String[]> data, boolean append) {
+    public void writeToCSV(String fileName, List<String[]> data, boolean append, String title) {
         try {
             File file = new File(fileName);
             boolean fileExists = file.exists();
@@ -231,6 +289,9 @@ public class AppiumFutuDemo {
             }
 
             try (FileWriter writer = new FileWriter(file, append)) {
+
+                if (title != null)
+                    writer.append(title).append("\n");
 
                 // 写入数据
                 for (String[] row : data) {
@@ -307,31 +368,27 @@ public class AppiumFutuDemo {
                 // 判断元素是否在屏幕内
                 if (isVisible) {
                     // 获取元素位置和尺寸
-                    
+
                     int screenHeight = size.getHeight();
-                    
+
                     // 计算目标位置（屏幕高度的1/4处）
                     int targetY = (int) (screenHeight * 0.25);
-                    
+
                     // 计算需要滚动的距离
                     int scrollDistance = elementY - targetY;
-                    
+
                     // 如果需要滚动，则执行滚动
                     if (Math.abs(scrollDistance) > 10) {
                         scrollToPosition(scrollDistance);
                     }
-                    
+
                     isElementVisible = true;
                     break; // 如果元素在屏幕内，退出循环
-                }
-                else
-                {
-                    //在下方
-                    if (elementY > 0)
-                    {
+                } else {
+                    // 在下方
+                    if (elementY > 0) {
                         scroll(1, false);
-                    }
-                    else //在上方
+                    } else // 在上方
                     {
                         scroll(1, true);
                     }
@@ -356,39 +413,39 @@ public class AppiumFutuDemo {
     void scrollToPosition(int targetY) {
         // 获取屏幕尺寸
         Dimension size = driver.manage().window().getSize();
-        
+
         // 限制最大滚动距离为屏幕高度的1/3
         int maxScrollDistance = (int) (size.getHeight() * 0.33);
         int actualScrollDistance = Math.min(Math.abs(targetY), maxScrollDistance) * (targetY < 0 ? -1 : 1);
-        
+
         // 设置起始X坐标为屏幕中间
         int startX = size.getWidth() / 2;
-        
+
         // 设置起始Y坐标为屏幕高度的70%处（比之前更靠上）
         int startY = (int) (size.getHeight() * 0.7);
-        
+
         // 计算结束Y坐标，根据调整后的滚动距离
         int endY = startY - actualScrollDistance;
 
         // 创建PointerInput对象
         PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
-        
+
         // 创建操作序列
         Sequence scroll = new Sequence(finger, 0);
-        
+
         // 添加动作1：将手指移动到起始位置
         scroll.addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.viewport(), startX, startY));
-        
+
         // 添加动作2：手指按下
         scroll.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
-        
+
         // 添加动作3：手指移动到结束位置，增加持续时间到800毫秒（更慢更平滑）
         scroll.addAction(
                 finger.createPointerMove(Duration.ofMillis(800), PointerInput.Origin.viewport(), startX, endY));
-        
+
         // 添加动作4：手指抬起
         scroll.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
-        
+
         // 执行整个滚动操作
         driver.perform(Collections.singletonList(scroll));
     }
