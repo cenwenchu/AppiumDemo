@@ -58,9 +58,9 @@ public class AppiumFutuDemo {
 
     }
 
-    void test() {
-        findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持仓行业分布']", 10);
-    }
+    // void test() {
+    //     findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持仓行业分布']", 10);
+    // }
 
     public void init(String udid, String platformVersion) {
         try {
