@@ -30,7 +30,6 @@ public class AIUtil {
                 prop.load(input);
                 API_Key = prop.getProperty("api_key");
             } catch (IOException ex) {
-                // 记录完整的异常信息到日志系统
                 Logger.getLogger(AIUtil.class.getName()).log(Level.SEVERE, "加载AI配置时发生异常", ex);
             }
         }
