@@ -1,6 +1,11 @@
 package com.demo.appium;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
@@ -12,12 +17,24 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 
 public class AIUtil {
 
-    static String API_Key = "sk-9e627e4006a1489ca50c998ac1579e9b";
+    static String API_Key = "";
     static String Base_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
 
     public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,boolean isStream)
     {
+        if (API_Key.equals(""))
+        {
+            try (InputStream input = AIUtil.class.getResourceAsStream("/AIConfig.res")) {
+                Properties prop = new Properties();
+                prop.load(input);
+                API_Key = prop.getProperty("api_key");
+            } catch (IOException ex) {
+                // 记录完整的异常信息到日志系统
+                Logger.getLogger(AIUtil.class.getName()).log(Level.SEVERE, "加载AI配置时发生异常", ex);
+            }
+        }
+
         return callAIModel(arrayOfContentParts, aiModel,API_Key,Base_URL,isStream);
     }
 
@@ -50,7 +67,7 @@ public class AIUtil {
                     });
                     
                 });
-                
+
                 result = resultBuilder.toString();
 
             } catch (Exception e) {
