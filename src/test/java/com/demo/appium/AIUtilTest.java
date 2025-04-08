@@ -6,6 +6,7 @@ import java.util.List;
 import static org.junit.Assert.assertNotSame;
 import org.junit.Test;
 
+import com.demo.appium.util.AIUtil;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
 import com.openai.models.chat.completions.ChatCompletionContentPartImage;
 import com.openai.models.chat.completions.ChatCompletionContentPartText;

@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +22,8 @@ import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import com.demo.appium.util.AIUtil;
+import com.demo.appium.util.SQLiteStorage;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
 import com.openai.models.chat.completions.ChatCompletionContentPartText;
 
@@ -35,6 +38,10 @@ import io.appium.java_client.ios.options.XCUITestOptions;
 public class AppiumFutuDemo {
 
     IOSDriver driver = null;
+    SQLiteStorage sqLiteStorage = null;
+
+    String[] columnDefinitions = new String[]{"机构名称", "股票名称","股票代码","持仓比例","变动股份","变动比例"};
+    String[] columnDefinitions2 = new String[]{"机构名称", "股票名称","股票代码","持仓比例:real","变动股份","变动比例:real"};
 
     public static void main(String[] args) {
 
@@ -47,16 +54,21 @@ public class AppiumFutuDemo {
             String udid = "00008101-000D196A2691001E";
             String platformVersion = "18.3.2";
 
-            // udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
-            // platformVersion = "15.8.2";
+            udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
+            platformVersion = "15.8.2";
 
             
             futuDemo.init(udid, platformVersion);
 
-            futuDemo.doGatherFutuInfo(1, 3);
+            futuDemo.doGatherFutuInfo(3, 3);
 
-            futuDemo.callAIToProcessCSV();
-        } finally {
+            futuDemo.callAIToProcessCSV(true);
+        } 
+        catch(Exception ex)
+        {
+            System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
+        }
+        finally {
             futuDemo.destory();
 
             System.out.println("富途牛牛分析结束!");
@@ -72,10 +84,16 @@ public class AppiumFutuDemo {
     public void init(String udid, String platformVersion) {
         try {
 
+            sqLiteStorage = new SQLiteStorage("futu.db");
+            sqLiteStorage.dropTable("futuAgencies");
+            sqLiteStorage.createTables("futuAgencies", columnDefinitions2, null);
+
+
             XCUITestOptions options = new XCUITestOptions()
                     .setUdid(udid)
                     .setPlatformName("iOS")
                     .setPlatformVersion(platformVersion)
+                    .setCommandTimeouts(Duration.ofMinutes(60))
                     .setBundleId("cn.futu.FutuTraderPhone");
 
             driver = new IOSDriver(
@@ -87,7 +105,7 @@ public class AppiumFutuDemo {
         }
     }
 
-    public void callAIToProcessCSV() {
+    public void callAIToProcessCSV(boolean isSaveToDB) {
 
         System.out.println("开始调用AI 分析统计数据!");
 
@@ -118,12 +136,15 @@ public class AppiumFutuDemo {
                 List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
 
                 arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
-                    .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，我只要结果）。具体需要处理的数据如下：").build()));
+                    .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，返回结果列为：股票名称,股票代码,持仓比例,变动股份,变动比例）。具体需要处理的数据如下：").build()));
 
                 arrayOfContentParts.add(ChatCompletionContentPart
                     .ofText(ChatCompletionContentPartText.builder().text(csvContent.toString()).build()));
 
                 String result = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_PLUS, true);
+
+
+                System.out.println("AI result:" + result);
 
                 // 将AI返回的结果按行分割，并转换为List<String[]>格式
                 String[] lines = result.split("\n");
@@ -138,17 +159,56 @@ public class AppiumFutuDemo {
                         isData = true;
                         continue;
                     }
+                    else if (line.contains("万"))
+                    {
+                        isData = true;
+                    }
 
                     if (isData)
-                        data.add(line.split(","));
+                    {
+                        line = line.replaceAll("%", "").replaceAll("<", "");
+
+                        String[] newArray = new String[line.split(",").length + 1];
+                        newArray[0] = csvFile.getName().replace(".csv", "");
+                        System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
+                        data.add(newArray);
+
+                        System.out.println("add line:" + line);
+                    }
+                    else
+                    {
+                        System.out.println("ignore line:" + line);
+                    }
                 }
-                this.writeToCSV(csvFile.getName(), data, false, "名称,代码,持仓比例,变动股份,变动比例");
+                
+                this.writeToCSV(csvFile.getName(), data, false, String.join(",", columnDefinitions));
+                this.writeToDB("futuAgencies", data,columnDefinitions);
 
             }
         }
 
     
 
+    }
+
+    public void writeToDB(String tableName, List<String[]> data, String[] title) {
+        if (sqLiteStorage == null) {
+            try {
+                sqLiteStorage = new SQLiteStorage("futu.db");
+            } catch (SQLException e) {
+                System.err.println("创建SQLiteStorage失败：" + e.getMessage());
+                return;
+            }
+        }
+
+        try {
+            // 直接插入数据，假设表已经存在
+            for (String[] row : data) {
+                sqLiteStorage.storeData(tableName, title, row);
+            }
+        } catch (SQLException e) {
+            System.err.println("写入数据库失败：" + e.getMessage());
+        }
     }
 
     public void doGatherFutuInfo(int agencyCount, int maxScrollCount) {
@@ -243,8 +303,8 @@ public class AppiumFutuDemo {
 
         while (consecutiveDuplicates < maxConsecutiveDuplicates && scrollCount < maxScrollCount) {
 
-            this.scrollHorizontal(1, 0.1,false,0);
-            this.scrollHorizontal(1, 0.1,true,200);
+            //this.scrollHorizontal(1, 0.1,false,0);
+            //this.scrollHorizontal(1, 0.1,true,200);
             List<WebElement> elements = driver.findElements(
                     AppiumBy.xpath(
                             "//XCUIElementTypeTable/XCUIElementTypeCell/XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
@@ -303,7 +363,7 @@ public class AppiumFutuDemo {
         }
 
         // 将数据写入CSV文件
-        writeToCSV(csvFileName, data, isAppend, "名称,持仓比例,变动股份,变动比例");
+        writeToCSV(csvFileName, data, isAppend, String.join(",", "股票名称","股票代码","持仓比例","变动股份","变动比例"));
 
         System.out.println("一共有效的数据为：" + data.size() + " 条");
 
@@ -376,6 +436,7 @@ public class AppiumFutuDemo {
                     writer.append(String.join(",", row));
                     writer.append("\n");
                 }
+                writer.flush();
             }
         } catch (IOException e) {
             System.err.println("写入CSV文件时出错：" + e.getMessage());
@@ -384,7 +445,22 @@ public class AppiumFutuDemo {
 
     public void destory() {
         if (driver != null) {
-            driver.quit();
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                System.err.println("Error while quitting driver: " + e.getMessage());
+                // Additional cleanup if needed
+            }
+        }
+
+        if (this.sqLiteStorage != null)
+        {
+            try {
+                sqLiteStorage.close();
+            } catch (SQLException e) {
+                // TODO Auto-generated catch block
+                System.err.println("关闭sqliteStorage 出错:" + e.getMessage());
+            }
         }
     }
 

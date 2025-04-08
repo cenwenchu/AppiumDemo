@@ -23,4 +23,6 @@ public enum AIModel {
     public String getApiUrl() {
         return apiUrl;
     }
+
+    
 }

@@ -18,7 +18,7 @@ import io.appium.java_client.ios.options.XCUITestOptions;
  * Hello world!
  *
  */
-public class AppiumDemo {
+public class AppiumWebDemo {
     public static void main(String[] args) {
         System.out.println("Hello World!");
 
