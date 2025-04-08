@@ -1,6 +1,8 @@
 package com.demo.appium;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
@@ -18,6 +20,9 @@ import org.openqa.selenium.interactions.PointerInput;
 import org.openqa.selenium.interactions.Sequence;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+
+import com.openai.models.chat.completions.ChatCompletionContentPart;
+import com.openai.models.chat.completions.ChatCompletionContentPartText;
 
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.ios.IOSDriver;
@@ -45,11 +50,12 @@ public class AppiumFutuDemo {
             // udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
             // platformVersion = "15.8.2";
 
+            
             futuDemo.init(udid, platformVersion);
 
-            futuDemo.doGatherFutuInfo(3);
+            futuDemo.doGatherFutuInfo(1, 3);
 
-            // futuDemo.test();
+            futuDemo.callAIToProcessCSV();
         } finally {
             futuDemo.destory();
 
@@ -58,9 +64,10 @@ public class AppiumFutuDemo {
 
     }
 
-    // void test() {
-    //     findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持仓行业分布']", 10);
-    // }
+     void test() {
+        this.scrollHorizontal(1, 0.1,false,0);
+        this.scrollHorizontal(1, 0.1,true,150);
+    }
 
     public void init(String udid, String platformVersion) {
         try {
@@ -80,7 +87,71 @@ public class AppiumFutuDemo {
         }
     }
 
-    public void doGatherFutuInfo(int agencyCount) {
+    public void callAIToProcessCSV() {
+
+        System.out.println("开始调用AI 分析统计数据!");
+
+        // 将文件读出来，然后调用AI的工具
+        // 获取当前目录
+        File currentDir = new File(".");
+        // 获取所有.csv文件
+        File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv"));
+
+        StringBuilder csvContent;
+
+        if (csvFiles != null) {
+            for (File csvFile : csvFiles) {
+
+                csvContent = new StringBuilder();
+                csvContent.append(csvFile.getName().replace(".csv", "")).append("持股情况如下:").append("\n");
+
+                try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        csvContent.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    System.err.println("读取CSV文件时出错：" + e.getMessage());
+                }
+
+                //
+                List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
+
+                arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
+                    .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，我只要结果）。具体需要处理的数据如下：").build()));
+
+                arrayOfContentParts.add(ChatCompletionContentPart
+                    .ofText(ChatCompletionContentPartText.builder().text(csvContent.toString()).build()));
+
+                String result = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_PLUS, true);
+
+                // 将AI返回的结果按行分割，并转换为List<String[]>格式
+                String[] lines = result.split("\n");
+
+                boolean isData = false;
+
+                List<String[]> data = new ArrayList<>();
+                for (String line : lines) {
+
+                    if (line.contains("变动比例"))
+                    {
+                        isData = true;
+                        continue;
+                    }
+
+                    if (isData)
+                        data.add(line.split(","));
+                }
+                this.writeToCSV(csvFile.getName(), data, false, "名称,代码,持仓比例,变动股份,变动比例");
+
+            }
+        }
+
+    
+
+    }
+
+    public void doGatherFutuInfo(int agencyCount, int maxScrollCount) {
         findElementAndClick("//XCUIElementTypeImage[contains(@name,'icon_tabbar_markets')]");
 
         findElementAndClick(
@@ -94,7 +165,7 @@ public class AppiumFutuDemo {
 
         findElementAndClick("//XCUIElementTypeStaticText[@name='热门机构']");
 
-        Set<String> processedAgents = new HashSet<>(); 
+        Set<String> processedAgents = new HashSet<>();
 
         while (agencyCount > 0) {
             List<WebElement> agencyElements = driver
@@ -127,7 +198,7 @@ public class AppiumFutuDemo {
 
                 System.out.println("机构： " + agencyElements.get(i).getText() + " 开始处理... ");
 
-                String csvNameString = agencyElements.get(i).getText() + "持股情况";
+                String csvNameString = agencyElements.get(i).getText();
                 agencyElements.get(i).click();
 
                 WebElement backElement = driver
@@ -136,7 +207,7 @@ public class AppiumFutuDemo {
 
                 findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持股列表']", 10);
 
-                getAgencyDetail(csvNameString, backElement, 2, false);
+                getAgencyDetail(csvNameString, backElement, maxScrollCount, false);
 
                 System.out.println("机构： " + agencyElements.get(i).getText() + " 处理完毕. ");
 
@@ -148,8 +219,7 @@ public class AppiumFutuDemo {
 
             if (!processedRows)
                 break;
-            else
-            {
+            else {
                 scroll(1, false);
             }
 
@@ -172,6 +242,9 @@ public class AppiumFutuDemo {
         int scrollCount = 0;
 
         while (consecutiveDuplicates < maxConsecutiveDuplicates && scrollCount < maxScrollCount) {
+
+            this.scrollHorizontal(1, 0.1,false,0);
+            this.scrollHorizontal(1, 0.1,true,200);
             List<WebElement> elements = driver.findElements(
                     AppiumBy.xpath(
                             "//XCUIElementTypeTable/XCUIElementTypeCell/XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
@@ -280,6 +353,11 @@ public class AppiumFutuDemo {
      */
     public void writeToCSV(String fileName, List<String[]> data, boolean append, String title) {
         try {
+            if (!fileName.endsWith(".csv"))
+            {
+                fileName += ".csv";
+            }
+
             File file = new File(fileName);
             boolean fileExists = file.exists();
 
@@ -329,22 +407,28 @@ public class AppiumFutuDemo {
         }
     }
 
-    void scrollHorizontal(int maxScrollAttempts, double rate, boolean scrollRight) {
+    void scrollHorizontal(int maxScrollAttempts, double rate, boolean scrollRight,int XOffset) {
         for (int i = 0; i < maxScrollAttempts; i++) {
             Dimension size = driver.manage().window().getSize();
-            int startX = scrollRight ? (int) (size.getWidth() * rate) : (int) (size.getWidth() * (1 - rate));
-            int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) : (int) (size.getWidth() * rate);
+            int startX = scrollRight ? (int) (size.getWidth() * rate) + XOffset: (int) (size.getWidth() * (1 - rate));
+            int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) + XOffset: (int) (size.getWidth() * rate);
             int startY = size.getHeight() / 2; // 屏幕中间位置
 
             // 使用W3C Actions API
             PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
             Sequence scroll = new Sequence(finger, 0);
-            scroll.addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.viewport(), startX, startY));
+
+            scroll.addAction(finger.createPointerMove(Duration.ofMillis(100), PointerInput.Origin.viewport(), startX, startY));
             scroll.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
+
             scroll.addAction(
                     finger.createPointerMove(Duration.ofMillis(1000), PointerInput.Origin.viewport(), endX, startY)); // 增加滑动时间
             scroll.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
+
             driver.perform(Collections.singletonList(scroll));
+
+            // 添加短暂停顿让滑动完成
+            try { Thread.sleep(500); } catch (InterruptedException e) {}
         }
     }
 

@@ -4,6 +4,7 @@ public enum AIModel {
     QWEN_VL_PLUS("qwen-vl-plus"),
     QWEN_OMNI_TURBO("qwen-omni-turbo"),
     QWEN_PLUS("qwen-plus"),
+    QWEN_TURBO("qwen-turbo"),
     DEEP_SEEK(""),
     GPT_4("gpt-4");
 
