@@ -24,6 +24,15 @@ public class AIUtilTest
 
         List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
 
+        arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder().text("你认为人工智能最大的优势是什么？").build()));
+
+        String result = AIUtil.callAIModel(arrayOfContentParts,AIModel.DEEP_SEEK,true);
+        
+        System.out.println(result);
+
+
+        arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
+
         arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder().text("图片中的猫是什么品种的猫？").build()));
 
         String imgUrl = "https://p0.meituan.net/imgupload/0ff9ea17050bceb4a366dace0f7528237025166.jpg%40_100q%7Cwatermark%3D0";
@@ -32,7 +41,7 @@ public class AIUtilTest
 
         arrayOfContentParts.add(ChatCompletionContentPart.ofImageUrl(imageUrl));
 
-        String result = AIUtil.callAIModel(arrayOfContentParts,AIModel.QWEN_OMNI_TURBO,true);
+        result = AIUtil.callAIModel(arrayOfContentParts,AIModel.QWEN_OMNI_TURBO,true);
         
         System.out.println(result);
         

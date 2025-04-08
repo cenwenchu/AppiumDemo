@@ -17,33 +17,37 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 
 public class AIUtil {
 
-    static String API_Key = "";
-    static String Base_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    static String Aliyun_Key = "";
+    static String DS_Key = "";
 
 
     public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,boolean isStream)
     {
-        if (API_Key.equals(""))
+        if (Aliyun_Key.equals("") || DS_Key.equals(""))
         {
             try (InputStream input = AIUtil.class.getResourceAsStream("/AIConfig.res")) {
                 Properties prop = new Properties();
                 prop.load(input);
-                API_Key = prop.getProperty("api_key");
+                Aliyun_Key = prop.getProperty("aliyun_key");
+                DS_Key = prop.getProperty("dk-key");
             } catch (IOException ex) {
                 Logger.getLogger(AIUtil.class.getName()).log(Level.SEVERE, "加载AI配置时发生异常", ex);
             }
         }
 
-        return callAIModel(arrayOfContentParts, aiModel,API_Key,Base_URL,isStream);
+        if (aiModel.equals(AIModel.DEEP_SEEK))
+            return callAIModel(arrayOfContentParts, aiModel,DS_Key,isStream);
+        else
+            return callAIModel(arrayOfContentParts, aiModel,Aliyun_Key,isStream);
     }
 
-    public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,String api_key,String base_url,boolean isStream)
+    public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,String api_key,boolean isStream)
     {
         String result = "";
 
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(api_key)
-                .baseUrl(base_url) 
+                .baseUrl(aiModel.getApiUrl()) 
                 .build();
 
 
