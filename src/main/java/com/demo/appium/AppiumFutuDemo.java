@@ -40,15 +40,14 @@ public class AppiumFutuDemo {
     IOSDriver driver = null;
     SQLiteStorage sqLiteStorage = null;
 
-    String[] columnDefinitions = new String[]{"机构名称", "股票名称","股票代码","持仓比例","变动股份","变动比例"};
-    String[] columnDefinitions2 = new String[]{"机构名称", "股票名称","股票代码","持仓比例:real","变动股份","变动比例:real"};
+    String[] columnDefinitions = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例" };
+    String[] columnDefinitions2 = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real" };
 
     public static void main(String[] args) {
 
         System.out.println("开始分析富途牛牛!");
 
         long consumeTime = System.currentTimeMillis();
-        
 
         AppiumFutuDemo futuDemo = new AppiumFutuDemo();
 
@@ -60,31 +59,26 @@ public class AppiumFutuDemo {
             udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
             platformVersion = "15.8.2";
 
-            
             futuDemo.init(udid, platformVersion);
 
             futuDemo.doGatherFutuInfo(30, 5);
 
             futuDemo.callAIToProcessCSV(true);
-        } 
-        catch(Exception ex)
-        {
+        } catch (Exception ex) {
             System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
-        }
-        finally {
+        } finally {
             futuDemo.destory();
 
-           
             consumeTime = System.currentTimeMillis() - consumeTime;
 
-            System.out.println("富途牛牛分析结束! 耗时：" + consumeTime/1000 + " 秒");
+            System.out.println("富途牛牛分析结束! 耗时：" + consumeTime / 1000 + " 秒");
         }
 
     }
 
-     void test() {
-        this.scrollHorizontal(1, 0.1,false,0);
-        this.scrollHorizontal(1, 0.1,true,150);
+    void test() {
+        this.scrollHorizontal(1, 0.1, false, 0);
+        this.scrollHorizontal(1, 0.1, true, 150);
     }
 
     public void init(String udid, String platformVersion) {
@@ -93,7 +87,6 @@ public class AppiumFutuDemo {
             sqLiteStorage = new SQLiteStorage("futu.db");
             sqLiteStorage.dropTable("futuAgencies");
             sqLiteStorage.createTables("futuAgencies", columnDefinitions2, null);
-
 
             XCUITestOptions options = new XCUITestOptions()
                     .setUdid(udid)
@@ -126,74 +119,78 @@ public class AppiumFutuDemo {
         if (csvFiles != null) {
             for (File csvFile : csvFiles) {
 
-                csvContent = new StringBuilder();
-                csvContent.append(csvFile.getName().replace(".csv", "")).append("持股情况如下:").append("\n");
+                try {
 
-                try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        csvContent.append(line).append("\n");
+                    csvContent = new StringBuilder();
+                    csvContent.append(csvFile.getName().replace(".csv", "")).append("持股情况如下:").append("\n");
+
+                    try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            csvContent.append(line).append("\n");
+                        }
+                    } catch (IOException e) {
+                        System.err.println("读取CSV文件时出错：" + e.getMessage());
                     }
-                } catch (IOException e) {
-                    System.err.println("读取CSV文件时出错：" + e.getMessage());
+
+                    //
+                    List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
+
+                    arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
+                            .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，返回结果列为：股票名称,股票代码,持仓比例,变动股份,变动比例）。具体需要处理的数据如下：")
+                            .build()));
+
+                    arrayOfContentParts.add(ChatCompletionContentPart
+                            .ofText(ChatCompletionContentPartText.builder().text(csvContent.toString()).build()));
+
+                    String result = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_PLUS, true);
+
+                    System.out.println("AI result:" + result);
+
+                    // 将AI返回的结果按行分割，并转换为List<String[]>格式
+                    String[] lines = result.split("\n");
+
+                    boolean isData = false;
+
+                    List<String[]> data = new ArrayList<>();
+                    for (String line : lines) {
+
+                        if (line.contains("变动比例")) {
+                            isData = true;
+                            continue;
+                        } else if (line.contains("万")) {
+                            isData = true;
+                        }
+
+                        if (isData) {
+                            line = line.replaceAll("%", "").replaceAll("<", "");
+
+                            if (line.split(",").length == columnDefinitions.length) {
+                                String[] newArray = new String[line.split(",").length + 1];
+                                newArray[0] = csvFile.getName().replace(".csv", "");
+                                System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
+                                data.add(newArray);
+
+                                System.out.println("add line:" + line);
+                            } else {
+                                System.out.println("ignore line:" + line);
+                            }
+
+                        } else {
+                            System.out.println("ignore line:" + line);
+                        }
+                    }
+
+                    this.writeToCSV(csvFile.getName(), data, false, String.join(",", columnDefinitions));
+                    this.writeToDB("futuAgencies", data, columnDefinitions);
+
+                } catch (Exception ex) {
+                    System.err.println(
+                            "callAIToProcessCSV 执行出错," + "fileName: " + csvFile.getName() + " ," + ex.getMessage());
                 }
-
-                //
-                List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
-
-                arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
-                    .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，返回结果列为：股票名称,股票代码,持仓比例,变动股份,变动比例）。具体需要处理的数据如下：").build()));
-
-                arrayOfContentParts.add(ChatCompletionContentPart
-                    .ofText(ChatCompletionContentPartText.builder().text(csvContent.toString()).build()));
-
-                String result = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_PLUS, true);
-
-
-                System.out.println("AI result:" + result);
-
-                // 将AI返回的结果按行分割，并转换为List<String[]>格式
-                String[] lines = result.split("\n");
-
-                boolean isData = false;
-
-                List<String[]> data = new ArrayList<>();
-                for (String line : lines) {
-
-                    if (line.contains("变动比例"))
-                    {
-                        isData = true;
-                        continue;
-                    }
-                    else if (line.contains("万"))
-                    {
-                        isData = true;
-                    }
-
-                    if (isData)
-                    {
-                        line = line.replaceAll("%", "").replaceAll("<", "");
-
-                        String[] newArray = new String[line.split(",").length + 1];
-                        newArray[0] = csvFile.getName().replace(".csv", "");
-                        System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
-                        data.add(newArray);
-
-                        System.out.println("add line:" + line);
-                    }
-                    else
-                    {
-                        System.out.println("ignore line:" + line);
-                    }
-                }
-                
-                this.writeToCSV(csvFile.getName(), data, false, String.join(",", columnDefinitions));
-                this.writeToDB("futuAgencies", data,columnDefinitions);
 
             }
         }
-
-    
 
     }
 
@@ -246,17 +243,16 @@ public class AppiumFutuDemo {
 
             for (int i = 0; i < elementCount; i++) {
 
-                //每次返回以后，都需要重新获取一遍数据，防止elements过期
+                // 每次返回以后，都需要重新获取一遍数据，防止elements过期
                 agencyElements = driver
-                    .findElements(AppiumBy.xpath(
-                            "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
+                        .findElements(AppiumBy.xpath(
+                                "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
 
-                if (agencyElements.isEmpty() || agencyElements.size() != elementCount)
-                {
+                if (agencyElements.isEmpty() || agencyElements.size() < i+1) {
                     System.err.println("单个机构分析返回以后，机构列表发生变化，跳过分析当前结果页面.");
+                    processedRows = true;
                     break;
                 }
-
 
                 String agencyName = agencyElements.get(i).getText();
 
@@ -324,8 +320,8 @@ public class AppiumFutuDemo {
 
         while (consecutiveDuplicates < maxConsecutiveDuplicates && scrollCount < maxScrollCount) {
 
-            //this.scrollHorizontal(1, 0.1,false,0);
-            //this.scrollHorizontal(1, 0.1,true,200);
+            // this.scrollHorizontal(1, 0.1,false,0);
+            // this.scrollHorizontal(1, 0.1,true,200);
             List<WebElement> elements = driver.findElements(
                     AppiumBy.xpath(
                             "//XCUIElementTypeTable/XCUIElementTypeCell/XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
@@ -384,7 +380,7 @@ public class AppiumFutuDemo {
         }
 
         // 将数据写入CSV文件
-        writeToCSV(csvFileName, data, isAppend, String.join(",", "股票名称","股票代码","持仓比例","变动股份","变动比例"));
+        writeToCSV(csvFileName, data, isAppend, String.join(",", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例"));
 
         System.out.println("一共有效的数据为：" + data.size() + " 条");
 
@@ -434,8 +430,7 @@ public class AppiumFutuDemo {
      */
     public void writeToCSV(String fileName, List<String[]> data, boolean append, String title) {
         try {
-            if (!fileName.endsWith(".csv"))
-            {
+            if (!fileName.endsWith(".csv")) {
                 fileName += ".csv";
             }
 
@@ -474,8 +469,7 @@ public class AppiumFutuDemo {
             }
         }
 
-        if (this.sqLiteStorage != null)
-        {
+        if (this.sqLiteStorage != null) {
             try {
                 sqLiteStorage.close();
             } catch (SQLException e) {
@@ -504,18 +498,19 @@ public class AppiumFutuDemo {
         }
     }
 
-    void scrollHorizontal(int maxScrollAttempts, double rate, boolean scrollRight,int XOffset) {
+    void scrollHorizontal(int maxScrollAttempts, double rate, boolean scrollRight, int XOffset) {
         for (int i = 0; i < maxScrollAttempts; i++) {
             Dimension size = driver.manage().window().getSize();
-            int startX = scrollRight ? (int) (size.getWidth() * rate) + XOffset: (int) (size.getWidth() * (1 - rate));
-            int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) + XOffset: (int) (size.getWidth() * rate);
+            int startX = scrollRight ? (int) (size.getWidth() * rate) + XOffset : (int) (size.getWidth() * (1 - rate));
+            int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) + XOffset : (int) (size.getWidth() * rate);
             int startY = size.getHeight() / 2; // 屏幕中间位置
 
             // 使用W3C Actions API
             PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
             Sequence scroll = new Sequence(finger, 0);
 
-            scroll.addAction(finger.createPointerMove(Duration.ofMillis(100), PointerInput.Origin.viewport(), startX, startY));
+            scroll.addAction(
+                    finger.createPointerMove(Duration.ofMillis(100), PointerInput.Origin.viewport(), startX, startY));
             scroll.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
 
             scroll.addAction(
@@ -525,7 +520,10 @@ public class AppiumFutuDemo {
             driver.perform(Collections.singletonList(scroll));
 
             // 添加短暂停顿让滑动完成
-            try { Thread.sleep(500); } catch (InterruptedException e) {}
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+            }
         }
     }
 
