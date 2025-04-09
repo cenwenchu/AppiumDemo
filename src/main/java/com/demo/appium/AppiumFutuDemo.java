@@ -47,6 +47,9 @@ public class AppiumFutuDemo {
 
         System.out.println("开始分析富途牛牛!");
 
+        long consumeTime = System.currentTimeMillis();
+        
+
         AppiumFutuDemo futuDemo = new AppiumFutuDemo();
 
         try {
@@ -60,7 +63,7 @@ public class AppiumFutuDemo {
             
             futuDemo.init(udid, platformVersion);
 
-            futuDemo.doGatherFutuInfo(3, 3);
+            futuDemo.doGatherFutuInfo(30, 5);
 
             futuDemo.callAIToProcessCSV(true);
         } 
@@ -71,7 +74,10 @@ public class AppiumFutuDemo {
         finally {
             futuDemo.destory();
 
-            System.out.println("富途牛牛分析结束!");
+           
+            consumeTime = System.currentTimeMillis() - consumeTime;
+
+            System.out.println("富途牛牛分析结束! 耗时：" + consumeTime/1000 + " 秒");
         }
 
     }
@@ -236,15 +242,30 @@ public class AppiumFutuDemo {
                 break;
 
             boolean processedRows = false;
+            int elementCount = agencyElements.size();
 
-            for (int i = 0; i < agencyElements.size(); i++) {
+            for (int i = 0; i < elementCount; i++) {
+
+                //每次返回以后，都需要重新获取一遍数据，防止elements过期
+                agencyElements = driver
+                    .findElements(AppiumBy.xpath(
+                            "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
+
+                if (agencyElements.isEmpty() || agencyElements.size() != elementCount)
+                {
+                    System.err.println("单个机构分析返回以后，机构列表发生变化，跳过分析当前结果页面.");
+                    break;
+                }
+
+
+                String agencyName = agencyElements.get(i).getText();
 
                 if (agencyCount <= 0)
                     break;
 
                 try {
                     // 尝试将字符串转换为数字
-                    Double.parseDouble(agencyElements.get(i).getText());
+                    Double.parseDouble(agencyName);
                     continue; // 如果是数字，跳过当前循环
                 } catch (NumberFormatException e) {
                     // 如果不是数字，继续执行后续代码
@@ -253,12 +274,12 @@ public class AppiumFutuDemo {
                 if (!agencyElements.get(i).isDisplayed())
                     continue;
 
-                if (processedAgents.contains(agencyElements.get(i).getText()))
+                if (processedAgents.contains(agencyName))
                     continue;
 
-                System.out.println("机构： " + agencyElements.get(i).getText() + " 开始处理... ");
+                System.out.println("机构： " + agencyName + " 开始处理... ");
 
-                String csvNameString = agencyElements.get(i).getText();
+                String csvNameString = agencyName;
                 agencyElements.get(i).click();
 
                 WebElement backElement = driver
@@ -269,10 +290,10 @@ public class AppiumFutuDemo {
 
                 getAgencyDetail(csvNameString, backElement, maxScrollCount, false);
 
-                System.out.println("机构： " + agencyElements.get(i).getText() + " 处理完毕. ");
+                System.out.println("机构： " + agencyName + " 处理完毕. ");
 
                 agencyCount -= 1;
-                processedAgents.add(agencyElements.get(i).getText());
+                processedAgents.add(agencyName);
                 processedRows = true;
 
             }
