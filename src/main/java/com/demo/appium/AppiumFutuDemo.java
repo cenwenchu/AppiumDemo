@@ -39,9 +39,14 @@ public class AppiumFutuDemo {
 
     IOSDriver driver = null;
     SQLiteStorage sqLiteStorage = null;
+    Set<String> processedAgents = new HashSet<>();
+    Set<String> processedAgentsByAI = new HashSet<>();
+
+    static String AI_SUFFIX = "-AI";
 
     String[] columnDefinitions = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例" };
-    String[] columnDefinitions2 = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real" };
+    String[] columnDefinitionsDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real" };
+    String[] columnDefinitionsCSV = new String[] { "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例" };
 
     public static void main(String[] args) {
 
@@ -61,9 +66,11 @@ public class AppiumFutuDemo {
 
             futuDemo.init(udid, platformVersion);
 
-            futuDemo.doGatherFutuInfo(30, 5);
+            //futuDemo.test();
 
-            futuDemo.callAIToProcessCSV(true);
+             futuDemo.doGatherFutuInfo(1, 5);
+
+             futuDemo.callAIToProcessCSV(true);
         } catch (Exception ex) {
             System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
         } finally {
@@ -77,16 +84,30 @@ public class AppiumFutuDemo {
     }
 
     void test() {
-        this.scrollHorizontal(1, 0.1, false, 0);
-        this.scrollHorizontal(1, 0.1, true, 150);
+        callAIToProcessCSV(true);
     }
 
     public void init(String udid, String platformVersion) {
         try {
+            // 获取当前目录下的所有csv文件
+            File currentDir = new File(".");
+            File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv"));
+
+            // 将csv文件名（去掉.csv后缀）添加到processedAgents集合中
+            if (csvFiles != null) {
+                for (File csvFile : csvFiles) {
+                    String fileName = csvFile.getName().replace(".csv", "");
+                    if (fileName.endsWith(AI_SUFFIX)) {
+                        processedAgentsByAI.add(fileName);
+                    } else {
+                        processedAgents.add(fileName);
+                    }
+                }
+            }
 
             sqLiteStorage = new SQLiteStorage("futu.db");
-            sqLiteStorage.dropTable("futuAgencies");
-            sqLiteStorage.createTables("futuAgencies", columnDefinitions2, null);
+            // sqLiteStorage.dropTable("futuAgencies");
+            sqLiteStorage.createTables("futuAgencies", columnDefinitionsDB, null);
 
             XCUITestOptions options = new XCUITestOptions()
                     .setUdid(udid)
@@ -112,17 +133,25 @@ public class AppiumFutuDemo {
         // 获取当前目录
         File currentDir = new File(".");
         // 获取所有.csv文件
-        File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv"));
+        File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv") && !name.contains(AI_SUFFIX));
 
         StringBuilder csvContent;
 
         if (csvFiles != null) {
             for (File csvFile : csvFiles) {
 
+                String fileNameString = csvFile.getName().replace(".csv", "");
+
+                if (processedAgentsByAI.contains(fileNameString+AI_SUFFIX))
+                {
+                    System.out.println("机构： " + fileNameString + " 已经通过AI处理过～ ");
+                    continue;
+                 }
+
                 try {
 
                     csvContent = new StringBuilder();
-                    csvContent.append(csvFile.getName().replace(".csv", "")).append("持股情况如下:").append("\n");
+                    csvContent.append(fileNameString).append("持股情况如下:").append("\n");
 
                     try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
                         String line;
@@ -165,9 +194,9 @@ public class AppiumFutuDemo {
                         if (isData) {
                             line = line.replaceAll("%", "").replaceAll("<", "");
 
-                            if (line.split(",").length == columnDefinitions.length) {
+                            if (line.split(",").length == columnDefinitions.length-1) {
                                 String[] newArray = new String[line.split(",").length + 1];
-                                newArray[0] = csvFile.getName().replace(".csv", "");
+                                newArray[0] = fileNameString;
                                 System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
                                 data.add(newArray);
 
@@ -181,7 +210,7 @@ public class AppiumFutuDemo {
                         }
                     }
 
-                    this.writeToCSV(csvFile.getName(), data, false, String.join(",", columnDefinitions));
+                    this.writeToCSV(fileNameString + AI_SUFFIX, data, false, String.join(",", columnDefinitions));
                     this.writeToDB("futuAgencies", data, columnDefinitions);
 
                 } catch (Exception ex) {
@@ -228,8 +257,6 @@ public class AppiumFutuDemo {
 
         findElementAndClick("//XCUIElementTypeStaticText[@name='热门机构']");
 
-        Set<String> processedAgents = new HashSet<>();
-
         while (agencyCount > 0) {
             List<WebElement> agencyElements = driver
                     .findElements(AppiumBy.xpath(
@@ -243,55 +270,54 @@ public class AppiumFutuDemo {
 
             for (int i = 0; i < elementCount; i++) {
 
-                // 每次返回以后，都需要重新获取一遍数据，防止elements过期
-                agencyElements = driver
-                        .findElements(AppiumBy.xpath(
-                                "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
-
-                if (agencyElements.isEmpty() || agencyElements.size() < i+1) {
-                    System.err.println("单个机构分析返回以后，机构列表发生变化，跳过分析当前结果页面.");
-                    processedRows = true;
-                    break;
-                }
-
-                String agencyName = agencyElements.get(i).getText();
-
-                if (agencyCount <= 0)
-                    break;
-
                 try {
-                    // 尝试将字符串转换为数字
-                    Double.parseDouble(agencyName);
-                    continue; // 如果是数字，跳过当前循环
-                } catch (NumberFormatException e) {
-                    // 如果不是数字，继续执行后续代码
+
+                    String agencyName = agencyElements.get(i).getText();
+
+                    if (agencyCount <= 0)
+                        break;
+
+                    try {
+                        // 尝试将字符串转换为数字
+                        Double.parseDouble(agencyName);
+                        continue; // 如果是数字，跳过当前循环
+                    } catch (NumberFormatException e) {
+                        // 如果不是数字，继续执行后续代码
+                    }
+
+                    if (!agencyElements.get(i).isDisplayed())
+                        continue;
+
+                    if (processedAgents.contains(agencyName))
+                    {
+                        System.out.println("机构： " + agencyName + " 已经抓取过，忽略 ");
+                        continue;
+                    }
+
+                    System.out.println("机构： " + agencyName + " 开始处理... ");
+
+                    String csvNameString = agencyName;
+                    agencyElements.get(i).click();
+
+                    WebElement backElement = driver
+                            .findElement(AppiumBy
+                                    .xpath("//XCUIElementTypeButton[contains(@name,'accessidentifier.futu.main')]"));
+
+                    findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持股列表']", 10);
+
+                    getAgencyDetail(csvNameString, backElement, maxScrollCount, false);
+
+                    System.out.println("机构： " + agencyName + " 处理完毕. ");
+
+                    agencyCount -= 1;
+                    processedAgents.add(agencyName);
+                    processedRows = true;
+
+                } catch (Exception ex) {
+                    processedRows = true;
+                    System.err.println(ex.getCause());
+                    break;
                 }
-
-                if (!agencyElements.get(i).isDisplayed())
-                    continue;
-
-                if (processedAgents.contains(agencyName))
-                    continue;
-
-                System.out.println("机构： " + agencyName + " 开始处理... ");
-
-                String csvNameString = agencyName;
-                agencyElements.get(i).click();
-
-                WebElement backElement = driver
-                        .findElement(AppiumBy
-                                .xpath("//XCUIElementTypeButton[contains(@name,'accessidentifier.futu.main')]"));
-
-                findElementByScroll(driver, "//XCUIElementTypeStaticText[@name='持股列表']", 10);
-
-                getAgencyDetail(csvNameString, backElement, maxScrollCount, false);
-
-                System.out.println("机构： " + agencyName + " 处理完毕. ");
-
-                agencyCount -= 1;
-                processedAgents.add(agencyName);
-                processedRows = true;
-
             }
 
             if (!processedRows)
@@ -304,7 +330,7 @@ public class AppiumFutuDemo {
 
         // 停顿5秒（5000毫秒）
         try {
-            Thread.sleep(5000);
+            Thread.sleep(100);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -322,10 +348,15 @@ public class AppiumFutuDemo {
 
             // this.scrollHorizontal(1, 0.1,false,0);
             // this.scrollHorizontal(1, 0.1,true,200);
+
+            long timeConsume = System.currentTimeMillis();
+
             List<WebElement> elements = driver.findElements(
                     AppiumBy.xpath(
-                            "//XCUIElementTypeTable/XCUIElementTypeCell/XCUIElementTypeStaticText[@name='添利']/ancestor::XCUIElementTypeCell[position()]"));
+                            "//XCUIElementTypeCell[.//*[@name='添利']]"));
 
+            System.out.println(" get stock elements  time consume: " + (System.currentTimeMillis() - timeConsume));
+            
             boolean foundNewData = false;
 
             for (WebElement element : elements) {
@@ -353,6 +384,8 @@ public class AppiumFutuDemo {
                 }
             }
 
+            System.out.println(" process stock elements  time consume: " + (System.currentTimeMillis() - timeConsume));
+
             if (!foundNewData) {
                 consecutiveDuplicates++;
             } else {
@@ -366,7 +399,7 @@ public class AppiumFutuDemo {
             System.out.println("已下翻 " + scrollCount + " 次，处理数据 " + data.size() + " 条");
 
             try {
-                Thread.sleep(200);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -380,7 +413,8 @@ public class AppiumFutuDemo {
         }
 
         // 将数据写入CSV文件
-        writeToCSV(csvFileName, data, isAppend, String.join(",", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例"));
+        if (!data.isEmpty())
+            writeToCSV(csvFileName, data, isAppend, String.join(",", columnDefinitionsCSV));
 
         System.out.println("一共有效的数据为：" + data.size() + " 条");
 
@@ -388,15 +422,22 @@ public class AppiumFutuDemo {
     }
 
     public WebElement findElementAndClick(String elementXPathString) {
+        return findElementAndClick(elementXPathString, true);
+    }
+
+    public WebElement findElementAndClick(String elementXPathString, boolean waitForElement) {
         try {
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
+            WebElement el;
 
-            // 先等待元素可见
-            WebElement el = wait
-                    .until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
-
-            // 再等待元素可点击
-            wait.until(ExpectedConditions.elementToBeClickable(el));
+            if (waitForElement) {
+                WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
+                // 先等待元素可见
+                el = wait.until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
+                // 再等待元素可点击
+                wait.until(ExpectedConditions.elementToBeClickable(el));
+            } else {
+                el = driver.findElement(AppiumBy.xpath(elementXPathString));
+            }
 
             // 尝试点击2次
             int maxAttempts = 2;
