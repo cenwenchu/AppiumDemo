@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.openqa.selenium.Dimension;
+import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.PointerInput;
@@ -23,13 +24,16 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import com.demo.appium.util.AIUtil;
+import com.demo.appium.util.OSSUtil;
 import com.demo.appium.util.SQLiteStorage;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
+import com.openai.models.chat.completions.ChatCompletionContentPartImage;
 import com.openai.models.chat.completions.ChatCompletionContentPartText;
 
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.ios.IOSDriver;
 import io.appium.java_client.ios.options.XCUITestOptions;
+
 
 /**
  * Hello world!
@@ -39,10 +43,13 @@ public class AppiumFutuDemo {
 
     IOSDriver driver = null;
     SQLiteStorage sqLiteStorage = null;
+    //HttpServer server;
     Set<String> processedAgents = new HashSet<>();
     Set<String> processedAgentsByAI = new HashSet<>();
 
     static String AI_SUFFIX = "-AI";
+    // static int port = 7980;
+    static String TEMP_PIC_FILE = "screenshot.png";
 
     String[] columnDefinitions = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例" };
     String[] columnDefinitionsDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real" };
@@ -66,11 +73,11 @@ public class AppiumFutuDemo {
 
             futuDemo.init(udid, platformVersion);
 
-            //futuDemo.test();
+            futuDemo.test();
 
-             futuDemo.doGatherFutuInfo(1, 5);
+            // futuDemo.doGatherFutuInfo(1, 2);
 
-             futuDemo.callAIToProcessCSV(true);
+            // futuDemo.callAIToProcessCSV(true);
         } catch (Exception ex) {
             System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
         } finally {
@@ -84,7 +91,10 @@ public class AppiumFutuDemo {
     }
 
     void test() {
-        callAIToProcessCSV(true);
+        List<String[]> data = new ArrayList<>();
+        Set<String> processedRows = new HashSet<>(); // 用于存储已处理的行
+
+        getAgentcyStocksByAI(processedAgents, data);
     }
 
     public void init(String udid, String platformVersion) {
@@ -120,10 +130,70 @@ public class AppiumFutuDemo {
                     // The default URL in Appium 1 is http://127.0.0.1:4723/wd/hub
                     new URI("http://127.0.0.1:4723").toURL(), options);
 
+            
+
         } catch (Exception ex) {
             System.err.println("AppiumFutu 初始化执行失败：" + ex.getMessage());
         }
     }
+
+    public void destory() {
+        if (driver != null) {
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                System.err.println("Error while quitting driver: " + e.getMessage());
+                // Additional cleanup if needed
+            }
+        }
+
+        // if (server != null) {
+        //     try {
+        //         server.stop(0);
+        //         System.out.println("服务已关闭: http://localhost:" + port);
+        //     } catch (Exception e) {
+        //         System.err.println("Error while quitting driver: " + e.getMessage());
+        //         // Additional cleanup if needed
+        //     }
+        // }
+
+        if (this.sqLiteStorage != null) {
+            try {
+                sqLiteStorage.close();
+            } catch (SQLException e) {
+                // TODO Auto-generated catch block
+                System.err.println("关闭sqliteStorage 出错:" + e.getMessage());
+            }
+        }
+    }
+
+    // void startHttpServer()
+    // {
+        
+    //     Path root = Paths.get("."); // 服务当前目录
+
+    //     try
+    //     {
+    //         server = HttpServer.create(new InetSocketAddress(port), 0);
+    //         server.createContext("/", exchange -> {
+    //             Path file = root.resolve(exchange.getRequestURI().getPath().substring(1));
+    //             if (Files.exists(file)) {
+    //                 exchange.sendResponseHeaders(200, Files.size(file));
+    //                 Files.copy(file, exchange.getResponseBody());
+    //             } else {
+    //                 exchange.sendResponseHeaders(404, -1);
+    //             }
+    //             exchange.close();
+    //         });
+    //         server.start();
+    //     }
+    //     catch(Exception ex)
+    //     {
+    //         System.err.println(ex.getMessage());
+    //     }
+        
+    //     System.out.println("服务已启动: http://localhost:" + port);
+    // }
 
     public void callAIToProcessCSV(boolean isSaveToDB) {
 
@@ -142,11 +212,10 @@ public class AppiumFutuDemo {
 
                 String fileNameString = csvFile.getName().replace(".csv", "");
 
-                if (processedAgentsByAI.contains(fileNameString+AI_SUFFIX))
-                {
+                if (processedAgentsByAI.contains(fileNameString + AI_SUFFIX)) {
                     System.out.println("机构： " + fileNameString + " 已经通过AI处理过～ ");
                     continue;
-                 }
+                }
 
                 try {
 
@@ -194,7 +263,7 @@ public class AppiumFutuDemo {
                         if (isData) {
                             line = line.replaceAll("%", "").replaceAll("<", "");
 
-                            if (line.split(",").length == columnDefinitions.length-1) {
+                            if (line.split(",").length == columnDefinitions.length - 1) {
                                 String[] newArray = new String[line.split(",").length + 1];
                                 newArray[0] = fileNameString;
                                 System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
@@ -288,8 +357,7 @@ public class AppiumFutuDemo {
                     if (!agencyElements.get(i).isDisplayed())
                         continue;
 
-                    if (processedAgents.contains(agencyName))
-                    {
+                    if (processedAgents.contains(agencyName)) {
                         System.out.println("机构： " + agencyName + " 已经抓取过，忽略 ");
                         continue;
                     }
@@ -336,6 +404,80 @@ public class AppiumFutuDemo {
         }
     }
 
+    boolean getAgentcyStocksByAI(Set<String> processedRows, List<String[]> data) {
+        boolean result = false;
+
+        // 截取当前屏幕
+        File screenshotFile = new File("./"+TEMP_PIC_FILE);
+        driver.getScreenshotAs(OutputType.FILE).renameTo(screenshotFile);
+        OSSUtil.uploadFileToOSS(screenshotFile, TEMP_PIC_FILE);
+
+
+        try {
+            // 将截图文件转换为Base64编码
+            //byte[] fileContent = FileUtils.readFileToByteArray(screenshotFile);
+           // String encodedString = Base64.getEncoder().encodeToString(fileContent);
+
+            List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
+
+            arrayOfContentParts.add(ChatCompletionContentPart
+                    .ofText(ChatCompletionContentPartText.builder().text("将图片中的数据整理为表格,用csv的格式输出结果,结果仅包含列名行和具体内容行,不需要更多说明和一些省略不确定的信息")
+                            .build()));
+
+            String imgUrl = OSSUtil.generatePublicUrl(TEMP_PIC_FILE);
+
+            ChatCompletionContentPartImage imageUrl = ChatCompletionContentPartImage.builder()
+                    .imageUrl(ChatCompletionContentPartImage.ImageUrl.builder().url(imgUrl).build()).build();
+
+            arrayOfContentParts.add(ChatCompletionContentPart.ofImageUrl(imageUrl));
+
+            String aiResponseString = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_VL_PLUS, true);
+
+            System.out.println(aiResponseString);
+
+        } catch (Exception e) {
+            System.err.println("截图处理失败：" + e.getMessage());
+        }
+
+        return result;
+    }
+
+    boolean getAgencyStocksByXPath(Set<String> processedRows, List<String[]> data) {
+
+        boolean result = false;
+
+        List<WebElement> elements = driver.findElements(
+                AppiumBy.xpath(
+                        "//XCUIElementTypeCell[.//*[@name='添利']]"));
+
+        for (WebElement element : elements) {
+
+            if (!element.isDisplayed())
+                continue;
+
+            List<WebElement> staticTexts = element
+                    .findElements(AppiumBy.xpath(".//XCUIElementTypeStaticText[position()]"));
+
+            if (staticTexts.size() >= 6) {
+                List<String> row = new ArrayList<>();
+                for (WebElement staticText : staticTexts) {
+                    if (!staticText.getText().equals("添利")) {
+                        row.add(staticText.getText());
+                    }
+                }
+
+                String rowString = String.join("|", row);
+
+                if (processedRows.add(rowString)) {
+                    data.add(row.toArray(new String[0]));
+                    result = true;
+                }
+            }
+        }
+
+        return result;
+    }
+
     void getAgencyDetail(String csvFileName, WebElement backElement, int maxScrollCount, boolean isAppend) {
         List<String[]> data = new ArrayList<>();
         Set<String> processedRows = new HashSet<>(); // 用于存储已处理的行
@@ -351,38 +493,9 @@ public class AppiumFutuDemo {
 
             long timeConsume = System.currentTimeMillis();
 
-            List<WebElement> elements = driver.findElements(
-                    AppiumBy.xpath(
-                            "//XCUIElementTypeCell[.//*[@name='添利']]"));
-
-            System.out.println(" get stock elements  time consume: " + (System.currentTimeMillis() - timeConsume));
-            
             boolean foundNewData = false;
 
-            for (WebElement element : elements) {
-
-                if (!element.isDisplayed())
-                    continue;
-
-                List<WebElement> staticTexts = element
-                        .findElements(AppiumBy.xpath(".//XCUIElementTypeStaticText[position()]"));
-
-                if (staticTexts.size() >= 6) {
-                    List<String> row = new ArrayList<>();
-                    for (WebElement staticText : staticTexts) {
-                        if (!staticText.getText().equals("添利")) {
-                            row.add(staticText.getText());
-                        }
-                    }
-
-                    String rowString = String.join("|", row);
-
-                    if (processedRows.add(rowString)) {
-                        data.add(row.toArray(new String[0]));
-                        foundNewData = true;
-                    }
-                }
-            }
+            foundNewData = getAgencyStocksByXPath(processedRows, data);
 
             System.out.println(" process stock elements  time consume: " + (System.currentTimeMillis() - timeConsume));
 
@@ -500,25 +613,7 @@ public class AppiumFutuDemo {
         }
     }
 
-    public void destory() {
-        if (driver != null) {
-            try {
-                driver.quit();
-            } catch (Exception e) {
-                System.err.println("Error while quitting driver: " + e.getMessage());
-                // Additional cleanup if needed
-            }
-        }
-
-        if (this.sqLiteStorage != null) {
-            try {
-                sqLiteStorage.close();
-            } catch (SQLException e) {
-                // TODO Auto-generated catch block
-                System.err.println("关闭sqliteStorage 出错:" + e.getMessage());
-            }
-        }
-    }
+    
 
     void scroll(int maxScrollAttempts, boolean scrollUp) {
         for (int i = 0; i < maxScrollAttempts; i++) {
