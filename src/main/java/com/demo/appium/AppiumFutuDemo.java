@@ -27,7 +27,7 @@ import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 
 /**
- * Hello world!
+ *  运行这个程序，需要本地启动xcode webdriverAgentRunner;然后还要启动 appium server；再需要链接一台iphone真机器，真机器上需要安装富途牛牛程序
  * 这是一个用于自动化处理富途牛牛App数据的类
  * 主要功能包括：
  * 1. 通过Appium自动化操作富途牛牛App
