@@ -21,33 +21,29 @@ public class AIAgentDemo {
 
         String URIString = "http://127.0.0.1:4723";
 
-        String udid = "00008101-000D196A2691001E";
-        String platformVersion = "18.3.2";
+        // String udid = "00008101-000D196A2691001E";
+        // String platformVersion = "18.3.2";
 
-        udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
-        platformVersion = "15.8.2";
+        String udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
+        String platformVersion = "15.8.2";
         AppiumDriver driver = null;
         String TEMP_PIC_FILE = "screenshot.png";
         SQLiteStorage sqLiteStorage = null;
 
-        String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值" };
-        String[] columnDefinitionDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real","持股市值" };
 
-
-        String dbFileString = "futu.db";
-        String tableNameString = "futuAgencies";
-
-        String AI_SUFFIX = "-AI";
+        // String dbFileString = "futu.db";
+        // String tableNameString = "futuAgencies";
+        // String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值" };
+        // String[] columnDefinitionDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real","持股市值" };
+        // String AI_SUFFIX = "-AI";
 
         try
         {
 
-            sqLiteStorage = new SQLiteStorage(dbFileString);
+            // sqLiteStorage = new SQLiteStorage(dbFileString);
             // sqLiteStorage.dropTable("futuAgencies");
-            sqLiteStorage.createTables(tableNameString, columnDefinitionDB, null);
-
-            sqLiteStorage.batchSaveCSVFilesToDB(tableNameString, columnDefinition, ".","", true);
-
+            // sqLiteStorage.createTables(tableNameString, columnDefinitionDB, null);
+            // sqLiteStorage.batchSaveCSVFilesToDB(tableNameString, columnDefinition, ".","", true);
 
 
             driver = AppiumUtil.createAppiumDriver(udid, platformVersion, 
@@ -71,33 +67,7 @@ public class AIAgentDemo {
 
             String aiResponseString = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_OMNI_TURBO, true);
             
-            int x = 0;
-            int y = 0;
-
-            // 解析AI返回的坐标
-            if (aiResponseString.matches("\\(\\d+,\\d+\\),\\(\\d+,\\d+\\)")) {
-                // 提取两个坐标
-                String[] coordinates = aiResponseString.replaceAll("[()]", "").split(",");
-                int x1 = Integer.parseInt(coordinates[0]);
-                int y1 = Integer.parseInt(coordinates[1]);
-                int x2 = Integer.parseInt(coordinates[2]);
-                int y2 = Integer.parseInt(coordinates[3]);
-                
-                // 计算中心点坐标
-                x = (x1 + x2) / 2;
-                y = (y1 + y2) / 2;
-            } else if (aiResponseString.matches("\\(\\d+,\\d+\\)")) {
-                // 如果只有一个坐标，直接使用
-                String[] point = aiResponseString.replaceAll("[()]", "").split(",");
-                x = Integer.parseInt(point[0]);
-                y = Integer.parseInt(point[1]);
-            }
-
-            System.out.println(aiResponseString + ", x: " + x + ", y: " + y);
-
-           
-            if (x > 0 & y > 0)
-                AppiumUtil.clickByCoordinates(driver, x, y);
+            System.out.println(aiResponseString);
 
 
             Thread.sleep(2000);

@@ -21,10 +21,17 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 
 public class AIUtil {
 
+    // 阿里云API密钥
     static String Aliyun_Key = "";
+    // DeepSeek API密钥
     static String DS_Key = "";
 
-
+    /**
+     * 构建ChatCompletionContentParts列表
+     * @param textParts 文本内容列表
+     * @param imageUrls 图片URL列表
+     * @return 包含文本和图片的ChatCompletionContentParts列表
+     */
     public static List<ChatCompletionContentPart> buildChatCompletionContentParts(List<String> textParts, List<String> imageUrls)
     {
 
@@ -47,13 +54,19 @@ public class AIUtil {
             }
         }
 
-
         return arrayOfContentParts;
     }
 
-
+    /**
+     * 调用AI模型
+     * @param arrayOfContentParts 输入内容列表
+     * @param aiModel 使用的AI模型
+     * @param isStream 是否使用流式响应
+     * @return AI模型的响应结果
+     */
     public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,boolean isStream)
     {
+        // 如果API密钥未加载，则从配置文件加载
         if (Aliyun_Key.equals("") || DS_Key.equals(""))
         {
             try (InputStream input = AIUtil.class.getResourceAsStream("/AIConfig.res")) {
@@ -66,22 +79,32 @@ public class AIUtil {
             }
         }
 
+        // 根据模型选择对应的API密钥
         if (aiModel.equals(AIModel.DEEP_SEEK))
             return callAIModel(arrayOfContentParts, aiModel,DS_Key,isStream);
         else
             return callAIModel(arrayOfContentParts, aiModel,Aliyun_Key,isStream);
     }
 
+    /**
+     * 调用AI模型的具体实现
+     * @param arrayOfContentParts 输入内容列表
+     * @param aiModel 使用的AI模型
+     * @param api_key API密钥
+     * @param isStream 是否使用流式响应
+     * @return AI模型的响应结果
+     */
     public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,String api_key,boolean isStream)
     {
         String result = "";
 
+        // 创建OpenAI客户端
         OpenAIClient client = OpenAIOkHttpClient.builder()
                 .apiKey(api_key)
                 .baseUrl(aiModel.getApiUrl()) 
                 .build();
 
-
+        // 构建请求参数
         ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                 .addUserMessageOfArrayOfContentParts(arrayOfContentParts)
                 .model(aiModel.getModelName())
@@ -89,6 +112,7 @@ public class AIUtil {
 
         client.chat().completions().createStreaming(params);
 
+        // 处理流式响应
         if (isStream)
         {
             StringBuilder resultBuilder = new StringBuilder(); // 使用 StringBuilder 拼接字符串
@@ -109,6 +133,7 @@ public class AIUtil {
             }
         }
         else{
+            // 处理非流式响应
             ChatCompletion chatCompletion = client.chat().completions().create(params);
 
             result = chatCompletion.choices().get(0).message().content().orElse("");      
@@ -116,7 +141,4 @@ public class AIUtil {
 
         return result;
     }
-
-
-
 }

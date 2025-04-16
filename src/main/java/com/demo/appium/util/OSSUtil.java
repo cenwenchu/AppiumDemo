@@ -12,7 +12,9 @@ import com.aliyun.oss.OSSClientBuilder;
 
 import io.appium.java_client.AppiumDriver;
 
-
+/**
+ * OSS工具类，用于处理与阿里云OSS相关的操作
+ */
 public class OSSUtil {
 
     // 阿里云OSS配置
@@ -21,6 +23,12 @@ public class OSSUtil {
     private static String ALIYUN_ACCESS_KEY_SECRET = ""; // 替换为你的AccessKey Secret
     private static String BUCKET_NAME = ""; // 替换为你的Bucket名称
 
+    /**
+     * 截屏并上传到OSS
+     * @param driver Appium驱动实例
+     * @param screenshotTempName 截图临时文件名
+     * @return 上传后的文件URL
+     */
     public static String captureAndUploadScreenshot(AppiumDriver driver,String screenshotTempName)
     {
         File screenshotFile = new File("./" + screenshotTempName);
@@ -31,6 +39,9 @@ public class OSSUtil {
     
     /**
      * 上传文件到OSS
+     * @param file 要上传的文件
+     * @param objectName OSS中的对象名称
+     * @return 上传后的文件URL
      */
     public static String uploadFileToOSS(File file, String objectName) {
 
@@ -81,10 +92,11 @@ public class OSSUtil {
 
     /**
      * 生成公共访问URL
+     * @param objectName OSS中的对象名称
+     * @return 可公开访问的URL
      */
     public static String generatePublicUrl(String objectName) {
         return ENDPOINT.replace("https://", "http://" + BUCKET_NAME + ".") + "/" + objectName;
     }
-
 
 }

@@ -18,9 +18,14 @@ import io.appium.java_client.AppiumDriver;
 import io.appium.java_client.ios.IOSDriver;
 import io.appium.java_client.ios.options.XCUITestOptions;
 
+/**
+ * Appium工具类，提供Appium相关操作方法的封装
+ */
 public class AppiumUtil {
 
-
+    /**
+     * 平台名称枚举类
+     */
     public enum PlatformName {
         IOS("iOS"),
         ANDROID("Android");
@@ -36,13 +41,20 @@ public class AppiumUtil {
         }
     }
 
+    /**
+     * 创建Appium驱动实例
+     * @param udid 设备唯一标识
+     * @param platformVersion 平台版本号
+     * @param platformName 平台名称
+     * @param bundleId 应用包名
+     * @param URIString Appium服务器地址
+     * @return Appium驱动实例
+     */
     public static AppiumDriver createAppiumDriver(String udid,String platformVersion,PlatformName platformName,String bundleId,String URIString)
     {
-
         AppiumDriver driver = null;
 
         try{
-
             if (platformName == PlatformName.IOS)
             {
                 XCUITestOptions options = new XCUITestOptions()
@@ -55,7 +67,6 @@ public class AppiumUtil {
                 driver = new IOSDriver(new URI(URIString).toURL(), options);
                 return driver;
             }
-                
         }
         catch(Exception ex)
         {
@@ -63,9 +74,12 @@ public class AppiumUtil {
         }
 
         return driver;
-        
     }
 
+    /**
+     * 销毁Appium驱动实例
+     * @param driver Appium驱动实例
+     */
     public static void destoryAppiumDriver(AppiumDriver driver)
     {
         if (driver != null) {
@@ -73,13 +87,17 @@ public class AppiumUtil {
                 driver.quit();
             } catch (Exception e) {
                 System.err.println("Error while quitting driver: " + e.getMessage());
-                // Additional cleanup if needed
             }
         }
     }
 
+    /**
+     * 通过坐标点击屏幕
+     * @param driver Appium驱动实例
+     * @param x 横坐标比例（0-1）
+     * @param y 纵坐标比例（0-1）
+     */
     public static void clickByCoordinates(AppiumDriver driver,double x, double y) {
-        
         Dimension size = driver.manage().window().getSize();
 
         PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
@@ -91,25 +109,35 @@ public class AppiumUtil {
         driver.perform(Collections.singletonList(tap));
     }
 
+    /**
+     * 查找元素并点击
+     * @param driver Appium驱动实例
+     * @param elementXPathString 元素XPath路径
+     * @return 被点击的元素
+     */
     public static WebElement findElementAndClick(AppiumDriver driver,String elementXPathString) {
         return findElementAndClick(driver,elementXPathString, true);
     }
 
+    /**
+     * 查找元素并点击
+     * @param driver Appium驱动实例
+     * @param elementXPathString 元素XPath路径
+     * @param waitForElement 是否等待元素出现
+     * @return 被点击的元素
+     */
     public static WebElement findElementAndClick(AppiumDriver driver,String elementXPathString, boolean waitForElement) {
         try {
             WebElement el;
 
             if (waitForElement) {
                 WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(2));
-                // 先等待元素可见
                 el = wait.until(ExpectedConditions.visibilityOfElementLocated(AppiumBy.xpath(elementXPathString)));
-                // 再等待元素可点击
                 wait.until(ExpectedConditions.elementToBeClickable(el));
             } else {
                 el = driver.findElement(AppiumBy.xpath(elementXPathString));
             }
 
-            // 尝试点击2次
             int maxAttempts = 2;
             Exception lastException = null;
 
@@ -132,14 +160,19 @@ public class AppiumUtil {
         }
     }
 
+    /**
+     * 垂直滚动屏幕
+     * @param driver Appium驱动实例
+     * @param maxScrollAttempts 最大滚动次数
+     * @param scrollUp 是否向上滚动
+     */
     public static void scroll(AppiumDriver driver,int maxScrollAttempts, boolean scrollUp) {
         for (int i = 0; i < maxScrollAttempts; i++) {
             Dimension size = driver.manage().window().getSize();
-            int startX = size.getWidth() - 10; // 靠近屏幕右边缘
+            int startX = size.getWidth() - 10;
             int startY = scrollUp ? (int) (size.getHeight() * 0.3) : (int) (size.getHeight() * 0.7);
             int endY = scrollUp ? (int) (size.getHeight() * 0.7) : (int) (size.getHeight() * 0.3);
 
-            // 使用W3C Actions API
             PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
             Sequence scroll = new Sequence(finger, 0);
             scroll.addAction(finger.createPointerMove(Duration.ZERO, PointerInput.Origin.viewport(), startX, startY));
@@ -151,14 +184,21 @@ public class AppiumUtil {
         }
     }
 
+    /**
+     * 水平滚动屏幕
+     * @param driver Appium驱动实例
+     * @param maxScrollAttempts 最大滚动次数
+     * @param rate 滚动比例
+     * @param scrollRight 是否向右滚动
+     * @param XOffset X轴偏移量
+     */
     public static void scrollHorizontal(AppiumDriver driver,int maxScrollAttempts, double rate, boolean scrollRight, int XOffset) {
         for (int i = 0; i < maxScrollAttempts; i++) {
             Dimension size = driver.manage().window().getSize();
             int startX = scrollRight ? (int) (size.getWidth() * rate) + XOffset : (int) (size.getWidth() * (1 - rate));
             int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) + XOffset : (int) (size.getWidth() * rate);
-            int startY = size.getHeight() / 2; // 屏幕中间位置
+            int startY = size.getHeight() / 2;
 
-            // 使用W3C Actions API
             PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
             Sequence scroll = new Sequence(finger, 0);
 
@@ -167,12 +207,11 @@ public class AppiumUtil {
             scroll.addAction(finger.createPointerDown(PointerInput.MouseButton.LEFT.asArg()));
 
             scroll.addAction(
-                    finger.createPointerMove(Duration.ofMillis(1000), PointerInput.Origin.viewport(), endX, startY)); // 增加滑动时间
+                    finger.createPointerMove(Duration.ofMillis(1000), PointerInput.Origin.viewport(), endX, startY));
             scroll.addAction(finger.createPointerUp(PointerInput.MouseButton.LEFT.asArg()));
 
             driver.perform(Collections.singletonList(scroll));
 
-            // 添加短暂停顿让滑动完成
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
@@ -180,6 +219,14 @@ public class AppiumUtil {
         }
     }
 
+    /**
+     * 通过滚动查找元素
+     * @param driver Appium驱动实例
+     * @param targetElementXpath 目标元素XPath路径
+     * @param maxScrollAttempts 最大滚动次数
+     * @return 找到的元素
+     * @throws RuntimeException 如果未找到元素
+     */
     public static WebElement findElementByScroll(AppiumDriver driver, String targetElementXpath, int maxScrollAttempts)
             throws RuntimeException {
         WebElement targetElement = null;

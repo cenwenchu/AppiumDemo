@@ -12,22 +12,41 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * SQLite存储工具类，用于操作SQLite数据库
+ */
 public class SQLiteStorage {
 
     private Connection conn;
+    // 用于验证表名和列名的正则表达式，支持中文、字母、数字和下划线
     private static final Pattern VALID_IDENTIFIER = Pattern.compile("^[\\u4e00-\\u9fa5a-zA-Z_][\\u4e00-\\u9fa5a-zA-Z0-9_]*$");
     
+    /**
+     * 构造函数，初始化数据库连接
+     * @param dbFile 数据库文件路径
+     * @throws SQLException 如果连接数据库失败
+     */
     public SQLiteStorage(String dbFile) throws SQLException {
         this.conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile);
         this.conn.setAutoCommit(false); // 关闭自动提交，启用事务
     }
     
+    /**
+     * 列类型枚举，支持TEXT、INTEGER和REAL三种类型
+     */
     public enum ColumnType {
         TEXT,
         INTEGER,
         REAL
     }
 
+    /**
+     * 创建数据表
+     * @param tableName 表名
+     * @param columnDefinitions 列定义数组
+     * @param primaryKey 主键列名
+     * @throws SQLException 如果创建表失败
+     */
     public void createTables(String tableName, String[] columnDefinitions, String primaryKey) throws SQLException {
         try {
             if (tableName == null || tableName.isEmpty()) {
@@ -79,6 +98,11 @@ public class SQLiteStorage {
         }
     }
 
+    /**
+     * 删除数据表
+     * @param tableName 要删除的表名
+     * @throws SQLException 如果删除表失败
+     */
     public void dropTable(String tableName) throws SQLException {
         try {
             if (tableName == null || tableName.isEmpty()) {
@@ -99,6 +123,14 @@ public class SQLiteStorage {
         }
     }
 
+    /**
+     * 批量保存CSV文件到数据库
+     * @param tableName 目标表名
+     * @param columnDefinition 列定义数组
+     * @param directoryPath CSV文件所在目录
+     * @param excludeString 要排除的文件名包含的字符串
+     * @param skipFirstTitleLine 是否跳过第一行标题
+     */
     public void batchSaveCSVFilesToDB(String tableName,String[] columnDefinition,String directoryPath,String excludeString,boolean skipFirstTitleLine)
     {
         File currentDir = new File(directoryPath);
@@ -154,6 +186,13 @@ public class SQLiteStorage {
 
     }
     
+    /**
+     * 存储单条数据到数据库
+     * @param tableName 目标表名
+     * @param columns 列名数组
+     * @param values 值数组
+     * @throws SQLException 如果插入数据失败
+     */
     public void storeData(String tableName, String[] columns, Object[] values) throws SQLException {
         try {
             if (tableName == null || tableName.isEmpty()) {
@@ -206,6 +245,13 @@ public class SQLiteStorage {
         }
     }
 
+    /**
+     * 带参数的查询
+     * @param query SQL查询语句
+     * @param params 查询参数
+     * @return 查询结果集
+     * @throws SQLException 如果查询失败
+     */
     public ResultSet queryWithParams(String query, Object... params) throws SQLException {
         try {
             if (query == null || query.isEmpty()) {

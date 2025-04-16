@@ -28,55 +28,64 @@ import io.appium.java_client.AppiumDriver;
 
 /**
  * Hello world!
- *
+ * 这是一个用于自动化处理富途牛牛App数据的类
+ * 主要功能包括：
+ * 1. 通过Appium自动化操作富途牛牛App
+ * 2. 抓取机构持股数据
+ * 3. 使用AI处理抓取的数据
+ * 4. 将处理后的数据存储到数据库和CSV文件中
  */
 public class AppiumFutuDemo {
 
-    AppiumDriver driver = null;
-    SQLiteStorage sqLiteStorage = null;
-    Set<String> processedAgents = new HashSet<>();
-    Set<String> processedAgentsByAI = new HashSet<>();
+    AppiumDriver driver = null; // Appium驱动实例
+    SQLiteStorage sqLiteStorage = null; // SQLite数据库存储实例
+    Set<String> processedAgents = new HashSet<>(); // 已处理的机构集合
+    Set<String> processedAgentsByAI = new HashSet<>(); // 已通过AI处理的机构集合
 
-    static String AI_SUFFIX = "-AI";
-    static String TEMP_PIC_FILE = "screenshot.png";
-    static String TEMP_PIC_FILE2 = "screenshot2.png";
+    static String AI_SUFFIX = "-AI"; // AI处理后的文件后缀
+    static String TEMP_PIC_FILE = "screenshot.png"; // 临时截图文件名
+    static String TEMP_PIC_FILE2 = "screenshot2.png"; // 第二个临时截图文件名
 
+    // 列定义
     String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值" };
     String[] columnDefinitionDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real","持股市值" };
     String[] columnDefinitionCSV = new String[] { "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值"};
 
+    String dbFileString = "futu.db"; // 数据库文件名
+    String tableNameString = "futuAgencies"; // 数据库表名
 
-    String dbFileString = "futu.db";
-    String tableNameString = "futuAgencies";
-
-
+    /**
+     * 主方法，程序入口
+     * @param args 命令行参数
+     */
     public static void main(String[] args) {
 
         System.out.println("开始分析富途牛牛!");
 
-        boolean isByAIProcess = true;
+        boolean isByAIProcess = true; // 是否使用AI处理数据
 
+        String udid = "00008101-000D196A2691001E"; // 设备UDID
+        String platformVersion = "18.3.2"; // 平台版本
 
-        String udid = "00008101-000D196A2691001E";
-        String platformVersion = "18.3.2";
+        udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730"; // 更新设备UDID
+        platformVersion = "15.8.2"; // 更新平台版本
 
-        udid = "f42f8aaa0d1e87d055a67fec69cbc78af07c8730";
-        platformVersion = "15.8.2";
-
-        long consumeTime = System.currentTimeMillis();
+        long consumeTime = System.currentTimeMillis(); // 记录开始时间
 
         AppiumFutuDemo futuDemo = new AppiumFutuDemo();
 
         try {
-
+            // 初始化
             futuDemo.init(udid, platformVersion);
 
+            // 收集富途信息
             futuDemo.doGatherFutuInfo(1, 3,isByAIProcess);
 
             if(!isByAIProcess)
-                futuDemo.callAIToProcessCSV(true);
+                futuDemo.callAIToProcessCSV(true); // 调用AI处理CSV
             else
             {
+                // 批量保存CSV文件到数据库
                 futuDemo.sqLiteStorage.batchSaveCSVFilesToDB(futuDemo.tableNameString, 
                         futuDemo.columnDefinition, ".","", true);
             }
@@ -84,15 +93,20 @@ public class AppiumFutuDemo {
         } catch (Exception ex) {
             System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
         } finally {
-            futuDemo.destory();
+            futuDemo.destory(); // 销毁资源
 
-            consumeTime = System.currentTimeMillis() - consumeTime;
+            consumeTime = System.currentTimeMillis() - consumeTime; // 计算耗时
 
             System.out.println("富途牛牛分析结束! 耗时：" + consumeTime / 1000 + " 秒");
         }
 
     }
 
+    /**
+     * 初始化方法
+     * @param udid 设备UDID
+     * @param platformVersion 平台版本
+     */
     public void init(String udid, String platformVersion) {
         try {
             // 获取当前目录下的所有csv文件
@@ -111,10 +125,12 @@ public class AppiumFutuDemo {
                 }
             }
 
+            // 初始化SQLite存储
             sqLiteStorage = new SQLiteStorage(dbFileString);
             // sqLiteStorage.dropTable("futuAgencies");
             sqLiteStorage.createTables(tableNameString, columnDefinitionDB, null);
 
+            // 创建Appium驱动
             driver = AppiumUtil.createAppiumDriver(udid,platformVersion,PlatformName.IOS,
                     AppBundleId.FUTU.getBundleId(),"http://127.0.0.1:4723");
 
@@ -123,36 +139,50 @@ public class AppiumFutuDemo {
         }
     }
 
+    /**
+     * 销毁资源方法
+     */
     public void destory() {
 
+        // 销毁Appium驱动
         AppiumUtil.destoryAppiumDriver(driver);
 
-
+        // 关闭SQLite存储
         if (this.sqLiteStorage != null) {
             try {
                 sqLiteStorage.close();
             } catch (SQLException e) {
-                // TODO Auto-generated catch block
                 System.err.println("关闭sqliteStorage 出错:" + e.getMessage());
             }
         }
     }
 
+    /**
+     * 收集富途信息方法
+     * @param agencyCount 机构数量
+     * @param maxScrollCount 最大滚动次数
+     * @param isByAIProcess 是否使用AI处理
+     */
     public void doGatherFutuInfo(int agencyCount, int maxScrollCount,boolean isByAIProcess) {
+        // 点击市场图标
         AppiumUtil.findElementAndClick(driver,"//XCUIElementTypeImage[contains(@name,'icon_tabbar_markets')]");
 
+        // 点击美股
         AppiumUtil.findElementAndClick(driver,
                 "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='美股']");
 
+        // 查找并点击机构追踪
         WebElement targetElement = AppiumUtil.findElementByScroll(driver,
                 "//XCUIElementTypeButton/XCUIElementTypeStaticText[@name='机构追踪']", 10);
 
         if (targetElement != null)
             targetElement.click();
 
+        // 点击热门机构
         AppiumUtil.findElementAndClick(driver,"//XCUIElementTypeStaticText[@name='热门机构']");
 
         while (agencyCount > 0) {
+            // 获取机构元素列表
             List<WebElement> agencyElements = driver
                     .findElements(AppiumBy.xpath(
                             "//XCUIElementTypeOther[@name='全部']/following-sibling::XCUIElementTypeCell/XCUIElementTypeStaticText[position()]"));
@@ -190,6 +220,8 @@ public class AppiumFutuDemo {
 
                     System.out.println("机构： " + agencyName + " 开始处理... ");
 
+                    long timeStamp = System.currentTimeMillis();
+
                     //String csvNameString = agencyName;
                     agencyElements.get(i).click();
 
@@ -201,7 +233,7 @@ public class AppiumFutuDemo {
 
                     getAgencyDetail(agencyName, backElement, maxScrollCount, false ,isByAIProcess);
 
-                    System.out.println("机构： " + agencyName + " 处理完毕. ");
+                    System.out.println("机构： " + agencyName + " 处理完毕. " + " 耗时: " + (System.currentTimeMillis()-timeStamp));
 
                     agencyCount -= 1;
                     processedAgents.add(agencyName);

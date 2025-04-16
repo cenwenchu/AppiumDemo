@@ -1,5 +1,11 @@
 package com.demo.appium.util;
 
+/**
+ * AppBundleId 枚举类，用于存储不同应用的包名和名称
+ * 每个枚举值包含两个属性：
+ * - bundleId: 应用的包名
+ * - appName: 应用的名称
+ */
 public enum AppBundleId {
     AMAP("com.autonavi.amap", "高德地图"),
     TENCENT_VIDEO("com.tencent.live4iphone", "腾讯视频"),
@@ -44,18 +50,33 @@ public enum AppBundleId {
     ALIPAY("com.alipay.iphoneclient", "支付宝"),
     GOOGLE_TRANSLATE("com.google.Translate", "Google 翻译");
 
+    // 应用的包名
     private final String bundleId;
+    // 应用的名称
     private final String appName;
 
+    /**
+     * 构造函数
+     * @param bundleId 应用的包名
+     * @param appName 应用的名称
+     */
     AppBundleId(String bundleId, String appName) {
         this.bundleId = bundleId;
         this.appName = appName;
     }
 
+    /**
+     * 获取应用的包名
+     * @return 应用的包名
+     */
     public String getBundleId() {
         return bundleId;
     }
 
+    /**
+     * 获取应用的名称
+     * @return 应用的名称
+     */
     public String getAppName() {
         return appName;
     }
