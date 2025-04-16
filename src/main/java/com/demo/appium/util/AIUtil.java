@@ -2,6 +2,7 @@ package com.demo.appium.util;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -14,12 +15,41 @@ import com.openai.core.http.StreamResponse;
 import com.openai.models.chat.completions.ChatCompletion;
 import com.openai.models.chat.completions.ChatCompletionChunk;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
+import com.openai.models.chat.completions.ChatCompletionContentPartImage;
+import com.openai.models.chat.completions.ChatCompletionContentPartText;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 
 public class AIUtil {
 
     static String Aliyun_Key = "";
     static String DS_Key = "";
+
+
+    public static List<ChatCompletionContentPart> buildChatCompletionContentParts(List<String> textParts, List<String> imageUrls)
+    {
+
+        List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
+
+        // 循环处理文本部分
+        if (textParts != null) {
+            for (String text : textParts) {
+                arrayOfContentParts.add(ChatCompletionContentPart
+                        .ofText(ChatCompletionContentPartText.builder().text(text).build()));
+            }
+        }
+
+        // 循环处理图片URL
+        if (imageUrls != null) {
+            for (String imageUrl : imageUrls) {
+                ChatCompletionContentPartImage imageUrlPart = ChatCompletionContentPartImage.builder()
+                        .imageUrl(ChatCompletionContentPartImage.ImageUrl.builder().url(imageUrl).build()).build();
+                arrayOfContentParts.add(ChatCompletionContentPart.ofImageUrl(imageUrlPart));
+            }
+        }
+
+
+        return arrayOfContentParts;
+    }
 
 
     public static String callAIModel(List<ChatCompletionContentPart> arrayOfContentParts,AIModel aiModel,boolean isStream)

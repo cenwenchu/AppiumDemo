@@ -1,10 +1,15 @@
 package com.demo.appium.util;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 public class SQLiteStorage {
@@ -92,6 +97,61 @@ public class SQLiteStorage {
             conn.rollback();
             throw e;
         }
+    }
+
+    public void batchSaveCSVFilesToDB(String tableName,String[] columnDefinition,String directoryPath,String excludeString,boolean skipFirstTitleLine)
+    {
+        File currentDir = new File(directoryPath);
+        // 获取所有.csv文件
+        File[] csvFiles ;
+        
+        if (excludeString != null && !excludeString.equals(""))
+            csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv") && !name.contains(excludeString));
+        else
+            csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv"));
+
+
+        if (csvFiles != null) {
+            for (File csvFile : csvFiles) 
+            {
+                List<String[]> data = new ArrayList<>();
+
+                try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
+                    String line;
+                    boolean isFirstLine = true;
+
+                    while ((line = reader.readLine()) != null) {
+
+                        if (skipFirstTitleLine)
+                            if (isFirstLine)
+                            {
+                                isFirstLine = false;
+                                continue;
+                            }
+
+                        //line = line.replaceAll("%", "").replaceAll("<", "");
+
+                        if (line.split(",").length == columnDefinition.length ) {
+
+                            data.add(line.split(","));
+                            System.out.println("add line:" + line);
+                        } else {
+                            System.out.println("ignore line:" + line);
+                        }
+                    }
+
+                    // 直接插入数据，假设表已经存在
+                    for (String[] row : data) {
+                        storeData(tableName, columnDefinition, row);
+                    }
+                } catch (Exception e) {
+                    System.err.println("读取CSV文件时出错：" + e.getMessage());
+                }
+
+
+            }
+        }
+
     }
     
     public void storeData(String tableName, String[] columns, Object[] values) throws SQLException {
