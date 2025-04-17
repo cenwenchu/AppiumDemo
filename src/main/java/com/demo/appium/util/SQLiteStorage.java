@@ -37,7 +37,8 @@ public class SQLiteStorage {
     public enum ColumnType {
         TEXT,
         INTEGER,
-        REAL
+        REAL,
+        DEFAULT_TIMESTAMP
     }
 
     /**
@@ -74,7 +75,11 @@ public class SQLiteStorage {
                 }
                 ColumnType columnType = parts.length > 1 ? 
                     ColumnType.valueOf(parts[1].trim().toUpperCase()) : ColumnType.TEXT;
-                sqlBuilder.append(parts[0].trim()).append(" ").append(columnType).append(", ");
+
+                if (columnType == ColumnType.DEFAULT_TIMESTAMP)
+                    sqlBuilder.append(parts[0].trim()).append(" ").append("TEXT DEFAULT (strftime('%Y-%m-%d', 'now'))").append(", ");
+                else
+                    sqlBuilder.append(parts[0].trim()).append(" ").append(columnType).append(", ");
             }
 
             if (primaryKey != null && !primaryKey.isEmpty()) {
@@ -87,6 +92,8 @@ public class SQLiteStorage {
             }
 
             sqlBuilder.append(")");
+
+            System.out.println(sqlBuilder.toString());
 
             try (PreparedStatement pstmt = conn.prepareStatement(sqlBuilder.toString())) {
                 pstmt.execute();

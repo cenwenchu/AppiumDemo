@@ -48,7 +48,7 @@ public class AppiumFutuDemo {
 
     // 列定义
     String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值" };
-    String[] columnDefinitionDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real","持股市值" };
+    String[] columnDefinitionDB = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例:real", "变动股份", "变动比例:real","持股市值","导入时间:DEFAULT_TIMESTAMP"};
     String[] columnDefinitionCSV = new String[] { "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例","持股市值"};
 
     String dbFileString = "futu.db"; // 数据库文件名
