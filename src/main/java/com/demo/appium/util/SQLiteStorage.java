@@ -173,7 +173,7 @@ public class SQLiteStorage {
                         if (line.split(",").length == columnDefinition.length ) {
 
                             data.add(line.split(","));
-                            System.out.println("add line:" + line);
+                            //System.out.println("add line:" + line);
                         } else {
                             System.out.println("ignore line:" + line);
                         }
