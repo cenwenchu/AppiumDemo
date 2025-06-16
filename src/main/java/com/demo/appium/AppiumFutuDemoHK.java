@@ -1,8 +1,6 @@
 package com.demo.appium;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -21,7 +19,6 @@ import com.demo.appium.util.AppiumUtil.PlatformName;
 import com.demo.appium.util.OSSUtil;
 import com.demo.appium.util.SQLiteStorage;
 import com.openai.models.chat.completions.ChatCompletionContentPart;
-import com.openai.models.chat.completions.ChatCompletionContentPartText;
 
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
@@ -36,7 +33,7 @@ import io.appium.java_client.AppiumDriver;
  * 3. 使用AI处理抓取的数据
  * 4. 将处理后的数据存储到数据库和CSV文件中
  */
-public class AppiumFutuDemo {
+public class AppiumFutuDemoHK {
 
     AppiumDriver driver = null; // Appium驱动实例
     SQLiteStorage sqLiteStorage = null; // SQLite数据库存储实例
@@ -44,8 +41,8 @@ public class AppiumFutuDemo {
     Set<String> processedAgentsByAI = new HashSet<>(); // 已通过AI处理的机构集合
 
     static String AI_SUFFIX = "-AI"; // AI处理后的文件后缀
-    static String TEMP_PIC_FILE = "screenshot.png"; // 临时截图文件名
-    static String TEMP_PIC_FILE2 = "screenshot2.png"; // 第二个临时截图文件名
+    static String TEMP_PIC_FILE = "screenshot_hk.png"; // 临时截图文件名
+    static String TEMP_PIC_FILE2 = "screenshot2_hk.png"; // 第二个临时截图文件名
 
     // 列定义
     String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例", "持股市值" };
@@ -53,8 +50,10 @@ public class AppiumFutuDemo {
             "导入时间:DEFAULT_TIMESTAMP" };
     String[] columnDefinitionCSV = new String[] { "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例", "持股市值" };
 
-    String dbFileString = "futu.db"; // 数据库文件名
+    String dbFileString = "futuHK.db"; // 数据库文件名
     String tableNameString = "futuAgencies"; // 数据库表名
+
+    String directoryPath = "./futuHK";
 
     /**
      * 主方法，程序入口
@@ -65,8 +64,6 @@ public class AppiumFutuDemo {
 
         System.out.println("开始分析富途牛牛!");
 
-        boolean isByAIProcess = true; // 是否使用AI处理数据
-
         String udid = "00008101-000D196A2691001E"; // 设备UDID
         String platformVersion = "18.3.2"; // 平台版本
 
@@ -74,12 +71,12 @@ public class AppiumFutuDemo {
         platformVersion = "15.8.2"; // 更新平台版本
 
         int retryTimes = 3;
-        int agencyNeedProcessCount = 300;
+        int agencyNeedProcessCount = 150;
         int agencyProcessStockPageCount = 20;
 
         long consumeTime = System.currentTimeMillis(); // 记录开始时间
 
-        AppiumFutuDemo futuDemo = new AppiumFutuDemo();
+        AppiumFutuDemoHK futuDemo = new AppiumFutuDemoHK();
 
         while (futuDemo.processedAgents.size() < agencyNeedProcessCount && retryTimes > 0) {
 
@@ -90,38 +87,30 @@ public class AppiumFutuDemo {
                 futuDemo.init(udid, platformVersion);
 
                 futuDemo.doGatherFutuInfo(agencyNeedProcessCount - futuDemo.processedAgents.size(),
-                        agencyProcessStockPageCount, isByAIProcess);
+                        agencyProcessStockPageCount, true);
 
             } catch (Exception ex) {
                 System.err.println("富途牛牛分析 分析执行出错：" + ex.getMessage());
             } finally {
+
                 consumeTime = System.currentTimeMillis() - consumeTime; // 计算耗时
 
                 System.out.println("富途牛牛分析结束! 耗时：" + consumeTime / 1000 + " 秒");
             }
 
             if (futuDemo.processedAgents.size() >= agencyNeedProcessCount) {
-                if (!isByAIProcess)
-                    futuDemo.callAIToProcessCSV(true); // 调用AI处理CSV
-                else {
-                    // 批量保存CSV文件到数据库
-                    futuDemo.sqLiteStorage.batchSaveCSVFilesToDB(futuDemo.tableNameString,
-                            futuDemo.columnDefinition, ".", "", true);
-                }
-
+                futuDemo.sqLiteStorage.batchSaveCSVFilesToDB(futuDemo.tableNameString,
+                            futuDemo.columnDefinition, futuDemo.directoryPath, "", true);
+                
                 break;
             } else {
                 retryTimes -= 1;
 
                 if (retryTimes < 0) {
-                    if (!isByAIProcess)
-                        futuDemo.callAIToProcessCSV(true); // 调用AI处理CSV
-                    else {
-                        // 批量保存CSV文件到数据库
-                        futuDemo.sqLiteStorage.batchSaveCSVFilesToDB(futuDemo.tableNameString,
-                                futuDemo.columnDefinition, ".", "", true);
-                    }
-
+                    // 批量保存CSV文件到数据库
+                    futuDemo.sqLiteStorage.batchSaveCSVFilesToDB(futuDemo.tableNameString,
+                                futuDemo.columnDefinition, futuDemo.directoryPath, "", true);
+                            
                     break;
                 }
             }
@@ -141,7 +130,12 @@ public class AppiumFutuDemo {
     public void init(String udid, String platformVersion) {
         try {
             // 获取当前目录下的所有csv文件
-            File currentDir = new File(".");
+            File currentDir = new File(directoryPath);
+
+            if (!currentDir.exists()) {
+                currentDir.mkdirs();
+            }
+
             File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv"));
 
             // 将csv文件名（去掉.csv后缀）添加到processedAgents集合中
@@ -204,7 +198,7 @@ public class AppiumFutuDemo {
 
         // 点击美股
         AppiumUtil.findElementAndClick(driver,
-                "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='美股']");
+                "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='港股']");
 
         // 查找并点击机构追踪
         WebElement targetElement = AppiumUtil.findElementByScroll(driver,
@@ -363,9 +357,9 @@ public class AppiumFutuDemo {
         // 将数据写入CSV文件
         if (!data.isEmpty())
             if (isByAIProcess)
-                writeToCSV(agencyName, data, isAppend, String.join(",", columnDefinition));
+                writeToCSV(directoryPath, agencyName, data, isAppend, String.join(",", columnDefinition));
             else
-                writeToCSV(agencyName, data, isAppend, String.join(",", columnDefinitionCSV));
+                writeToCSV(directoryPath, agencyName, data, isAppend, String.join(",", columnDefinitionCSV));
 
         System.out.println("一共有效的数据为：" + data.size() + " 条");
 
@@ -481,102 +475,6 @@ public class AppiumFutuDemo {
         return result;
     }
 
-    public void callAIToProcessCSV(boolean isSaveToDB) {
-
-        System.out.println("开始调用AI 分析统计数据!");
-
-        // 将文件读出来，然后调用AI的工具
-        // 获取当前目录
-        File currentDir = new File(".");
-        // 获取所有.csv文件
-        File[] csvFiles = currentDir.listFiles((dir, name) -> name.endsWith(".csv") && !name.contains(AI_SUFFIX));
-
-        StringBuilder csvContent;
-
-        if (csvFiles != null) {
-            for (File csvFile : csvFiles) {
-
-                String fileNameString = csvFile.getName().replace(".csv", "");
-
-                if (processedAgentsByAI.contains(fileNameString + AI_SUFFIX)) {
-                    System.out.println("机构： " + fileNameString + " 已经通过AI处理过～ ");
-                    continue;
-                }
-
-                try {
-
-                    csvContent = new StringBuilder();
-                    csvContent.append(fileNameString).append("持股情况如下:").append("\n");
-
-                    try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            csvContent.append(line).append("\n");
-                        }
-                    } catch (IOException e) {
-                        System.err.println("读取CSV文件时出错：" + e.getMessage());
-                    }
-
-                    //
-                    List<ChatCompletionContentPart> arrayOfContentParts = new ArrayList<ChatCompletionContentPart>();
-
-                    arrayOfContentParts.add(ChatCompletionContentPart.ofText(ChatCompletionContentPartText.builder()
-                            .text("以下为机构持股的情况，其中有些数据的列前后位置放错，请帮忙纠正一下；纠正以后，请帮忙输出正确的数据（注意，请直接输出最终结果，不要增加任何处理说明的文字，返回结果列为：股票名称,股票代码,持仓比例,变动股份,变动比例）。具体需要处理的数据如下：")
-                            .build()));
-
-                    arrayOfContentParts.add(ChatCompletionContentPart
-                            .ofText(ChatCompletionContentPartText.builder().text(csvContent.toString()).build()));
-
-                    String result = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_PLUS, true);
-
-                    System.out.println("AI result:" + result);
-
-                    // 将AI返回的结果按行分割，并转换为List<String[]>格式
-                    String[] lines = result.split("\n");
-
-                    boolean isData = false;
-
-                    List<String[]> data = new ArrayList<>();
-                    for (String line : lines) {
-
-                        if (line.contains("变动比例")) {
-                            isData = true;
-                            continue;
-                        } else if (line.contains("万")) {
-                            isData = true;
-                        }
-
-                        if (isData) {
-                            line = line.replaceAll("%", "").replaceAll("<", "");
-
-                            if (line.split(",").length == columnDefinition.length - 2) {
-                                String[] newArray = new String[line.split(",").length + 2];
-                                newArray[0] = fileNameString;
-                                System.arraycopy(line.split(","), 0, newArray, 1, line.split(",").length);
-                                data.add(newArray);
-
-                                // System.out.println("add line:" + line);
-                            } else {
-                                System.out.println("ignore line:" + line);
-                            }
-
-                        } else {
-                            System.out.println("ignore line:" + line);
-                        }
-                    }
-
-                    this.writeToCSV(fileNameString + AI_SUFFIX, data, false, String.join(",", columnDefinition));
-                    this.writeToDB("futuAgencies", data, columnDefinition);
-
-                } catch (Exception ex) {
-                    System.err.println(
-                            "callAIToProcessCSV 执行出错," + "fileName: " + csvFile.getName() + " ," + ex.getMessage());
-                }
-
-            }
-        }
-
-    }
 
     public void writeToDB(String tableName, List<String[]> data, String[] title) {
         if (sqLiteStorage == null) {
@@ -605,7 +503,7 @@ public class AppiumFutuDemo {
      * @param data     数据列表
      * @param append   是否追加到文件末尾
      */
-    public void writeToCSV(String fileName, List<String[]> data, boolean append, String title) {
+    public void writeToCSV(String directoryPath, String fileName, List<String[]> data, boolean append, String title) {
         try {
             if (!fileName.endsWith(".csv")) {
                 fileName += ".csv";
@@ -613,7 +511,7 @@ public class AppiumFutuDemo {
 
             fileName = fileName.replace("/", "-");
 
-            File file = new File(fileName);
+            File file = new File(directoryPath, fileName);
             boolean fileExists = file.exists();
 
             // 如果文件存在且不追加，则删除文件

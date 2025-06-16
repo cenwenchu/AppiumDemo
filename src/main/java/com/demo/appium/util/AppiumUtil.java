@@ -61,7 +61,7 @@ public class AppiumUtil {
                 .setUdid(udid)
                 .setPlatformName(platformName.getName())
                 .setPlatformVersion(platformVersion)
-                .setCommandTimeouts(Duration.ofMinutes(60))
+                .setCommandTimeouts(Duration.ofSeconds(3600))  // 将int转换为Duration对象
                 .setBundleId(bundleId);
 
                 driver = new IOSDriver(new URI(URIString).toURL(), options);
