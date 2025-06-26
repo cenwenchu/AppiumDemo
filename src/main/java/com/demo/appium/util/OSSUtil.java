@@ -3,12 +3,16 @@ package com.demo.appium.util;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 import org.openqa.selenium.OutputType;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import com.demo.appium.AIModel;
+import com.openai.models.chat.completions.ChatCompletionContentPart;
 
 import io.appium.java_client.AppiumDriver;
 
@@ -22,6 +26,31 @@ public class OSSUtil {
     private static String ALIYUN_ACCESS_KEY_ID = ""; // 替换为你的AccessKey ID
     private static String ALIYUN_ACCESS_KEY_SECRET = ""; // 替换为你的AccessKey Secret
     private static String BUCKET_NAME = ""; // 替换为你的Bucket名称
+
+    public static void main(String[] args) {
+        String imgUrl = OSSUtil.uploadFileToOSS(new File("./screenshot_hk.png"), "screenshot_hk.png");
+
+
+
+        List<String> textParts = new ArrayList<>();
+        List<String> imageUrls = new ArrayList<>();
+
+        textParts.add("将下面两张图片中的数据先独立整理成为两个表格,"
+                    + "一个表格列为：股票名称,股票代码,持仓比例,变动股份，另一个表列为：股票名称,股票代码,变动比例,持股市值"
+                    + ",然后将两个表格根据'股票名称'做关联，合并为一个表格，表格列为：'股票名称,股票代码,持仓比例,变动股份,变动比例,持股市值';"
+                    + " 请不要返回合并前的两个表格,仅返回合并后的表格！");
+
+        imageUrls.add(imgUrl);
+
+        List<ChatCompletionContentPart> arrayOfContentParts = AIUtil.buildChatCompletionContentParts(textParts,
+                    imageUrls);
+
+        // String aiResponseString = AIUtil.callAIModel(arrayOfContentParts,
+        // AIModel.QWEN_VL_PLUS, true);
+        String aiResponseString = AIUtil.callAIModel(arrayOfContentParts, AIModel.QWEN_OMNI_TURBO, true);
+
+        System.out.println(aiResponseString);
+    }
 
     /**
      * 截屏并上传到OSS

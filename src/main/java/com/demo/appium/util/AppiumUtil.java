@@ -61,7 +61,8 @@ public class AppiumUtil {
                 .setUdid(udid)
                 .setPlatformName(platformName.getName())
                 .setPlatformVersion(platformVersion)
-                .setCommandTimeouts(Duration.ofSeconds(3600))  // 将int转换为Duration对象
+                .setCommandTimeouts(Duration.ofSeconds(3600)) 
+                .setNewCommandTimeout(Duration.ofSeconds(3600)) // 将int转换为Duration对象
                 .setBundleId(bundleId);
 
                 driver = new IOSDriver(new URI(URIString).toURL(), options);
@@ -192,12 +193,17 @@ public class AppiumUtil {
      * @param scrollRight 是否向右滚动
      * @param XOffset X轴偏移量
      */
-    public static void scrollHorizontal(AppiumDriver driver,int maxScrollAttempts, double rate, boolean scrollRight, int XOffset) {
+    public static void scrollHorizontal(AppiumDriver driver,int maxScrollAttempts, double rate, boolean scrollRight, int XOffset,boolean islowPosition) {
         for (int i = 0; i < maxScrollAttempts; i++) {
             Dimension size = driver.manage().window().getSize();
             int startX = scrollRight ? (int) (size.getWidth() * rate) + XOffset : (int) (size.getWidth() * (1 - rate));
             int endX = scrollRight ? (int) (size.getWidth() * (1 - rate)) + XOffset : (int) (size.getWidth() * rate);
             int startY = size.getHeight() / 2;
+
+            if(islowPosition)
+            {
+                startY = (int) (size.getHeight() * 0.9);
+            }
 
             PointerInput finger = new PointerInput(PointerInput.Kind.TOUCH, "finger");
             Sequence scroll = new Sequence(finger, 0);

@@ -33,7 +33,7 @@ import io.appium.java_client.AppiumDriver;
  * 3. 使用AI处理抓取的数据
  * 4. 将处理后的数据存储到数据库和CSV文件中
  */
-public class AppiumFutuDemoHK {
+public class AppiumFutuDemoUS {
 
     AppiumDriver driver = null; // Appium驱动实例
     SQLiteStorage sqLiteStorage = null; // SQLite数据库存储实例
@@ -41,8 +41,8 @@ public class AppiumFutuDemoHK {
     Set<String> processedAgentsByAI = new HashSet<>(); // 已通过AI处理的机构集合
 
     static String AI_SUFFIX = "-AI"; // AI处理后的文件后缀
-    static String TEMP_PIC_FILE = "screenshot_hk.png"; // 临时截图文件名
-    static String TEMP_PIC_FILE2 = "screenshot2_hk.png"; // 第二个临时截图文件名
+    static String TEMP_PIC_FILE = "screenshot_us.png"; // 临时截图文件名
+    static String TEMP_PIC_FILE2 = "screenshot2_us.png"; // 第二个临时截图文件名
 
     // 列定义
     String[] columnDefinition = new String[] { "机构名称", "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例", "持股市值" };
@@ -50,10 +50,10 @@ public class AppiumFutuDemoHK {
             "导入时间:DEFAULT_TIMESTAMP" };
     String[] columnDefinitionCSV = new String[] { "股票名称", "股票代码", "持仓比例", "变动股份", "变动比例", "持股市值" };
 
-    String dbFileString = "futuHK.db"; // 数据库文件名
+    String dbFileString = "futuUS.db"; // 数据库文件名
     String tableNameString = "futuAgencies"; // 数据库表名
 
-    String directoryPath = "./futuHK";
+    String directoryPath = "./futuUS";
 
     /**
      * 主方法，程序入口
@@ -71,12 +71,12 @@ public class AppiumFutuDemoHK {
         platformVersion = "15.8.2"; // 更新平台版本
 
         int retryTimes = 3;
-        int agencyNeedProcessCount = 200;
+        int agencyNeedProcessCount = 116;
         int agencyProcessStockPageCount = 20;
 
         long consumeTime = System.currentTimeMillis(); // 记录开始时间
 
-        AppiumFutuDemoHK futuDemo = new AppiumFutuDemoHK();
+        AppiumFutuDemoUS futuDemo = new AppiumFutuDemoUS();
 
         while (futuDemo.processedAgents.size() < agencyNeedProcessCount && retryTimes > 0) {
 
@@ -198,7 +198,7 @@ public class AppiumFutuDemoHK {
 
         // 点击美股
         AppiumUtil.findElementAndClick(driver,
-                "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='港股']");
+                "//XCUIElementTypeCollectionView//XCUIElementTypeCell/XCUIElementTypeOther/XCUIElementTypeStaticText[@name='美股']");
 
         // 查找并点击机构追踪
         WebElement targetElement = AppiumUtil.findElementByScroll(driver,
@@ -334,9 +334,13 @@ public class AppiumFutuDemoHK {
                 consecutiveDuplicates = 0;
             }
 
+
+            System.err.println("before scroll");
             // 向下滚动并增加计数
             AppiumUtil.scroll(driver, 1, false);
             scrollCount++;
+
+            System.err.println("after scroll");
 
             System.out.println("已下翻 " + scrollCount + " 次，处理数据 " + data.size() + " 条");
 
@@ -372,11 +376,11 @@ public class AppiumFutuDemoHK {
         // 截取当前屏幕
         String imgUrl = OSSUtil.captureAndUploadScreenshot(driver, TEMP_PIC_FILE);
 
-        AppiumUtil.scrollHorizontal(driver, 1, 0.2, false, 0,true);
+        AppiumUtil.scrollHorizontal(driver, 1, 0.2, false, 0,false);
 
         String imgUrl2 = OSSUtil.captureAndUploadScreenshot(driver, TEMP_PIC_FILE2);
 
-        AppiumUtil.scrollHorizontal(driver, 1, 0.1, true, 200,true);
+        AppiumUtil.scrollHorizontal(driver, 1, 0.1, true, 200,false);
 
         try {
 

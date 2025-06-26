@@ -378,11 +378,11 @@ public class AppiumFutuDemo {
         // 截取当前屏幕
         String imgUrl = OSSUtil.captureAndUploadScreenshot(driver, TEMP_PIC_FILE);
 
-        AppiumUtil.scrollHorizontal(driver, 1, 0.2, false, 0);
+        AppiumUtil.scrollHorizontal(driver, 1, 0.2, false, 0,false);
 
         String imgUrl2 = OSSUtil.captureAndUploadScreenshot(driver, TEMP_PIC_FILE2);
 
-        AppiumUtil.scrollHorizontal(driver, 1, 0.1, true, 200);
+        AppiumUtil.scrollHorizontal(driver, 1, 0.1, true, 200,false);
 
         try {
 
